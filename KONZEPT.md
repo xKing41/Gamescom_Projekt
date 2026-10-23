@@ -1,6 +1,6 @@
 # HORT – Konzept
 
-> Arbeitstitel. Stand: 23.10.2026.
+> Arbeitstitel. Stand: 23.10.2026 – der Prototyp (v0.2) setzt die Kniffe und die Meta-Progression bis zum Early-Access-Umfang um; was noch fehlt, steht unter „Ausbaustufen“.
 > Ziel: Steam-Demo zum Next Fest im Juni 2027, Stand auf der gamescom im August 2027.
 
 ## In einem Satz
@@ -131,16 +131,16 @@ Und: Meta-Progression verlängert nur ein Spiel, dessen Kern schon trägt. Erst 
 
 ### Brutkammer: Was du ausbrütest, hängt davon ab, worauf du brütest
 
-- Gewinnst du, schlüpft das Ei. Welche Drachenart schlüpft, entscheidet der Inhalt deines Horts in der letzten Nacht.
+- Gewinnst du, schlüpft das Ei. Welche Drachenart schlüpft, entscheiden die acht Felder rund um das Ei: Ab zwei Schätzen einer Art schlüpft deren Drache. Am letzten Tag zeigt das Spiel an, was gerade schlüpfen würde.
 - Schlüpft eine Art, die du schon hast, bekommt sie eine neue Farbvariante.
 - Jede Art hat einen eigenen Start-Hort und eine eigene Regel:
 
 | Drachenart | Wie man sie ausbrütet | Eigene Regel |
 |---|---|---|
 | Golddrache | Startdrache | Keine Sonderregel – der Grunddrache, wie der King of Nothing in 9 Kings |
-| Kristalldrache | Hort überwiegend aus Edelsteinen | Edelsteine leiten Nachbar-Effekte in gerader Linie weiter |
-| Knochendrache | Viel Beute besiegter Helden im Hort | Gefallene Helden stehen in der nächsten Nacht als Wächter wieder auf |
-| Mondsilberdrache (geheim) | Besondere Mischung, die Raben streuen Hinweise | Glanz wirkt umgekehrt: Helden laufen zum *am wenigsten* glänzenden Schatz |
+| Kristalldrache | Mindestens zwei Edelsteine rund ums Ei | Edelsteine leiten Nachbar-Effekte in gerader Linie weiter |
+| Knochendrache | Mindestens zwei Stück Heldenbeute rund ums Ei | Bis zu drei gefallene Helden stehen in der nächsten Nacht als Knochenwächter auf |
+| Mondsilberdrache (geheim) | Zwei Stück wertloser Tand direkt neben dem Ei | Glanz wirkt umgekehrt: Helden laufen zum *am wenigsten* glänzenden Schatz. Sein Ei glänzt kaum |
 
 ### Drachenalter: Fortschritt in jedem Run
 
@@ -193,6 +193,8 @@ Zwischen den Runs ist die Höhle dein Trophäenraum: das Nest mit allen geschlü
 Battle Pass, Lootboxen, Saison-Pass, tägliche Aufgaben mit Ablaufdatum, Belohnungen nur für einen bestimmten Zeitraum, bezahlte Abkürzungen, Online-Zwang und dauerhafte Werte-Boni. Von genau diesen Dingen sind Spieler 2026 müde, und 9 Kings wird für zähen Grind kritisiert.
 
 ### Ausbaustufen
+
+Umgesetzt im Prototyp v0.2: drei Nachbarreiche aus fünf, Brutkammer mit vier Arten und Farbvarianten, Drachenalter (3 Stufen je Art), Legende 1–10, Erzfeinde, Hortbuch, 8 Taten, Endlose Belagerung, Wochen-Hort mit eigenem Bestwert, Hort-Codes, Speicherstand über Geräte hinweg. Noch offen sind Legende 11–20, Steam-Bestenlisten, Twitch-Helden, Flüche, die wachsende Höhle, der Workshop und Koop.
 
 | Stufe | Inhalt |
 |---|---|

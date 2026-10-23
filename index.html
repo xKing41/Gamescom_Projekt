@@ -20,8 +20,8 @@
     <p class="brand">Hort</p>
     <dl class="stats">
       <div><dt>Phase</dt><dd id="s-phase">Tag 1</dd></div>
-      <div><dt>Hortwert</dt><dd id="s-value">0</dd></div>
-      <div><dt>Drachenkraft</dt><dd id="s-power">×1,0</dd></div>
+      <div id="s-value-wrap"><dt>Hortwert</dt><dd id="s-value">0</dd></div>
+      <div id="s-power-wrap"><dt>Drachenkraft</dt><dd id="s-power">×1,0</dd></div>
       <div id="s-glut-wrap" hidden><dt>Glut</dt><dd id="s-glut">0/4</dd></div>
     </dl>
     <div class="bar-actions">
@@ -50,9 +50,23 @@
       <div><dt>Raubzug</dt><dd>Das Raubziel bestimmt deine Beute und wer nachts kommt. Die Raben verraten dir vorher, wer es ist.</dd></div>
       <div><dt>Nacht</dt><dd>Deine Klaue trifft Helden bis 2 Felder vor dir. Atem-Karten kosten Glut, die mit der Zeit nachlädt. Solange du zielst, läuft die Zeit langsamer.</dd></div>
       <div><dt>Drachenkraft</dt><dd>Je mehr dein Hort wert ist, desto mehr Schaden machen Klaue und Atem.</dd></div>
+      <div><dt>Höhle</dt><dd>Zwischen den Runs wählst du Drache, Legende-Stufe, deine vier Atem-Karten und den Modus.</dd></div>
+      <div><dt>Erfahrung</dt><dd>Jeder Run bringt deiner Drachenart Erfahrung, auch ein verlorener. Jede Stufe im Drachenalter schaltet etwas frei.</dd></div>
+      <div><dt>Schlüpfen</dt><dd>Die acht Felder rund ums Ei entscheiden, welcher Drache schlüpft. Eine neue Art hat eigene Regeln.</dd></div>
+      <div><dt>Erzfeinde</dt><dd>Wer mit einem wertvollen Schatz entkommt, kommt in einem späteren Run zurück – mit deinem Schatz.</dd></div>
       <div><dt>Tasten</dt><dd>1–4 Atem-Karten · Leertaste Pause · F Tempo · Esc abbrechen</dd></div>
     </dl>
     <button class="primary" type="button" id="btn-help-close">Verstanden</button>
+  </div>
+</div>
+<div class="overlay" id="book" hidden>
+  <div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-labelledby="book-title">
+    <div class="sheet-head">
+      <h2 id="book-title">Hortbuch</h2>
+      <button class="ghost small" type="button" id="btn-book-close">Schließen</button>
+    </div>
+    <div class="tabs" id="book-tabs" role="tablist" aria-label="Hortbuch"></div>
+    <div class="book-body" id="book-body"></div>
   </div>
 </div>
 <!-- markup:end -->

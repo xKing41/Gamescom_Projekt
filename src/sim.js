@@ -1,24 +1,75 @@
 // Spiellogik von Hort, ganz ohne Grafik.
 // Ein Run: Tag (Raubziel wählen, Beute nehmen, Hort ordnen) → Nacht (Helden, Atem-Karten) → Morgen (Beute der Besiegten).
 // Alle Zufälle laufen über den Seed im Zustand, deshalb lässt sich jeder Run als Hort-Code nachspielen.
+// Was zwischen den Runs passiert (Erfahrung, Freischaltungen, Taten), steht in meta.js – hier wird nur mitprotokolliert.
 
-import { TREASURES, HEROES, RAIDS, CARD_BY_ID, SPECIES, CONFIG } from './data.js';
+import { TREASURES, HEROES, RAIDS, RAID_ORDER, REALMS_PER_RUN, CARD_BY_ID, BASE_CARDS, HAND_SIZE, UNLOCKS, SPECIES, SPECIES_ORDER, HATCH_MIN, HATCH_PRIORITY, LEGEND, META, CONFIG } from './data.js';
 import { COLS, ROWS, N4, idx, inside, kindAt, isHoardCell, HOARD_CELLS, DRAGON_CELLS, DRAGON_CENTER, ENTRANCES, DIG_AREA } from './map.js';
 import { random, pick, pickWeighted, shuffle, randomSeed } from './rng.js';
 
 export const DAY_PHASES = new Set(['raid', 'loot', 'arrange']);
-const ACTIVE = new Set(['seek', 'grab', 'flee', 'leave']);
+const ACTIVE = new Set(['seek', 'grab', 'cast', 'flee', 'leave']);
 export const isActive = (h) => ACTIVE.has(h.state);
 export const activeHeroes = (state) => state.heroes.filter(isActive);
+const VERSION = 2;
 
 // ── Run ─────────────────────────────────────────────────────────
 
-export function createRun(seed = randomSeed()) {
+const MULTIPLY = ['spawnInterval', 'thiefSpeed', 'heroHp', 'lootChance', 'heroSpeed'];
+const ADD = ['glutRegenAdd', 'extraHeroes', 'extraNight'];
+
+// Die Regeln aller Legende-Stufen bis `level` zusammengefasst
+export function legendMods(level) {
+  const mods = { hiddenGroup: false, clever: 0 };
+  for (const key of MULTIPLY) mods[key] = 1;
+  for (const key of ADD) mods[key] = 0;
+  for (const { mod } of LEGEND.slice(0, level)) {
+    for (const [key, value] of Object.entries(mod)) {
+      if (MULTIPLY.includes(key)) mods[key] *= value;
+      else if (ADD.includes(key)) mods[key] += value;
+      else if (key === 'clever') mods.clever = Math.max(mods.clever, value);
+      else mods[key] = mods[key] || value;
+    }
+  }
+  return mods;
+}
+
+export function cardAvailable(id, unlocks) {
+  const card = CARD_BY_ID[id];
+  return !!card && (!card.unlock || unlocks.includes(card.unlock));
+}
+
+function normalizeOptions(options) {
+  const unlocks = Array.isArray(options.unlocks) ? options.unlocks.filter((id) => UNLOCKS[id]) : [];
+  let cards = (Array.isArray(options.cards) ? options.cards : BASE_CARDS)
+    .filter((id, i, list) => cardAvailable(id, unlocks) && list.indexOf(id) === i)
+    .slice(0, HAND_SIZE);
+  if (!cards.length) cards = BASE_CARDS.slice();
+  const nemeses = (Array.isArray(options.nemeses) ? options.nemeses : [])
+    .filter((n) => n && HEROES[n.type] && TREASURES[n.treasure])
+    .map((n) => ({ id: String(n.id), name: String(n.name), type: n.type, treasure: n.treasure, rank: Math.max(1, Math.min(META.nemesisMaxRank, Math.floor(n.rank) || 1)) }));
+  return {
+    species: SPECIES[options.species] ? options.species : 'gold',
+    variant: Number.isInteger(options.variant) ? options.variant : 0,
+    legend: Math.max(0, Math.min(LEGEND.length, Math.floor(options.legend ?? 0))),
+    cards,
+    unlocks,
+    nemeses,
+    mode: ['normal', 'endless', 'weekly', 'code'].includes(options.mode) ? options.mode : 'normal',
+  };
+}
+
+export function createRun(seed = randomSeed(), options = {}) {
   seed >>>= 0;
+  const opts = normalizeOptions(options);
+  const mods = legendMods(opts.legend);
   const state = {
-    version: 1,
+    version: VERSION,
     seed,
     rngState: seed,
+    opts,
+    mods,
+    nights: opts.mode === 'endless' ? 0 : CONFIG.nights + mods.extraNight, // 0 = endlos
     phase: 'raid',
     night: 1,
     hoard: new Array(COLS * ROWS).fill(null),
@@ -27,7 +78,11 @@ export function createRun(seed = randomSeed()) {
     heroes: [],
     digs: [],
     party: [],
+    guardians: [],
+    fallen: [],
+    smoke: [],
     nextUid: 1,
+    realms: [],
     raid: null,
     lootOffer: [],
     t: 0,
@@ -40,15 +95,37 @@ export function createRun(seed = randomSeed()) {
     lastNight: null,
     morningLoot: [],
     stats: { defeated: 0, escaped: 0, stolen: [], nightsSurvived: 0 },
+    runLog: { nights: [], landmark: false, maxHoard: 0, nemesisDefeated: [], nemesisEscaped: [], newNemeses: [], heroesSeen: [], treasuresSeen: [] },
+    nemesesWaiting: opts.nemeses.map((n) => n.id),
     species: null,
     lostBy: null,
     fx: [],
   };
-  for (const [id, c, r] of CONFIG.startHoard) state.hoard[idx(c, r)] = newItem(state, id);
+  state.realms = pickRealms(state);
+  for (const [id, c, r] of SPECIES[opts.species].start) state.hoard[idx(c, r)] = newItem(state, id);
+  state.runLog.maxHoard = hoardItems(state).length;
   return state;
 }
 
-const newItem = (state, id) => ({ uid: state.nextUid++, id });
+function see(state, list, id) {
+  if (!state.runLog[list].includes(id)) state.runLog[list].push(id);
+}
+
+function newItem(state, id) {
+  see(state, 'treasuresSeen', id);
+  return { uid: state.nextUid++, id };
+}
+
+export const isEndless = (state) => state.nights === 0;
+export const ruleOf = (state) => SPECIES[state.opts.species].rule;
+export const treasureAvailable = (state, id) => !UNLOCKS[id] || state.opts.unlocks.includes(id);
+
+function pickRealms(state) {
+  const available = RAID_ORDER.filter((id) => !RAIDS[id].unlock || state.opts.unlocks.includes(RAIDS[id].unlock));
+  if (available.length <= REALMS_PER_RUN) return available;
+  const chosen = new Set(shuffle(state, available).slice(0, REALMS_PER_RUN));
+  return RAID_ORDER.filter((id) => chosen.has(id));
+}
 
 export function snapshot(state) {
   return JSON.stringify({ ...state, fx: [] });
@@ -57,7 +134,7 @@ export function snapshot(state) {
 export function restore(json) {
   try {
     const state = JSON.parse(json);
-    return state?.version === 1 ? { ...state, fx: [] } : null;
+    return state?.version === VERSION ? { ...state, fx: [] } : null;
   } catch {
     return null;
   }
@@ -85,7 +162,7 @@ export function power(state) {
   return p;
 }
 
-function neighborItems(state, c, r) {
+function plainNeighbors(state, c, r) {
   const out = [];
   for (const [dc, dr] of N4) {
     const item = itemAt(state, c + dc, r + dr);
@@ -94,11 +171,39 @@ function neighborItems(state, c, r) {
   return out;
 }
 
+// Wer wirkt auf dieses Feld? Die direkten Nachbarn – beim Kristalldrachen auch alles,
+// was hinter einer Reihe Edelsteine liegt.
+export function neighborSources(state, c, r) {
+  if (ruleOf(state) !== 'conduct') return plainNeighbors(state, c, r);
+  const out = [];
+  for (const [dc, dr] of N4) {
+    let x = c + dc;
+    let y = r + dr;
+    for (;;) {
+      const item = itemAt(state, x, y);
+      if (!item) break;
+      out.push(item);
+      if (TREASURES[item.id].family !== 'edelstein') break;
+      x += dc;
+      y += dr;
+    }
+  }
+  return out;
+}
+
+const inSmoke = (state, c, r) => state.smoke.some((s) => Math.abs(s.c - c) <= 1 && Math.abs(s.r - r) <= 1);
+
+// Das Mondsilber-Ei glänzt kaum – sonst gilt der Glanz aus den Daten
+export function baseGlanz(state, id) {
+  const egg = SPECIES[state.opts.species].eggGlanz;
+  return id === 'ei' && egg != null ? egg : TREASURES[id].glanz;
+}
+
 export function effGlanz(state, c, r) {
   const item = itemAt(state, c, r);
-  if (!item) return 0;
-  let glanz = TREASURES[item.id].glanz;
-  for (const n of neighborItems(state, c, r)) glanz -= TREASURES[n.id].dims ?? 0;
+  if (!item || inSmoke(state, c, r)) return 0;
+  let glanz = baseGlanz(state, item.id);
+  for (const n of neighborSources(state, c, r)) glanz += (TREASURES[n.id].shines ?? 0) - (TREASURES[n.id].dims ?? 0);
   return Math.max(0, glanz);
 }
 
@@ -106,9 +211,16 @@ export function effWeight(state, c, r) {
   const item = itemAt(state, c, r);
   if (!item) return 0;
   let weight = TREASURES[item.id].weight;
-  for (const n of neighborItems(state, c, r)) weight += TREASURES[n.id].burdens ?? 0;
+  for (const n of neighborSources(state, c, r)) weight += TREASURES[n.id].burdens ?? 0;
   return weight;
 }
+
+function warded(state, c, r) {
+  const item = itemAt(state, c, r);
+  return !!item && (TREASURES[item.id].wards || neighborSources(state, c, r).some((n) => TREASURES[n.id].wards));
+}
+
+const floorGlanz = (state, f) => (inSmoke(state, f.c, f.r) ? 0 : baseGlanz(state, f.item.id));
 
 export function describeItem(state, item, c = null, r = null) {
   const d = TREASURES[item.id];
@@ -117,8 +229,8 @@ export function describeItem(state, item, c = null, r = null) {
     id: item.id,
     name: d.name,
     value: d.value,
-    glanz: inHoard ? effGlanz(state, c, r) : d.glanz,
-    baseGlanz: d.glanz,
+    glanz: inHoard ? effGlanz(state, c, r) : baseGlanz(state, item.id),
+    baseGlanz: baseGlanz(state, item.id),
     weight: inHoard ? effWeight(state, c, r) : d.weight,
     baseWeight: d.weight,
     text: d.text ?? '',
@@ -151,27 +263,49 @@ function placeNear(state, item, c0, r0) {
 // ── Tag ─────────────────────────────────────────────────────────
 
 export function chooseRaid(state, raidId) {
+  if (state.phase !== 'raid' || !state.realms.includes(raidId)) return false;
   const raid = RAIDS[raidId];
-  if (state.phase !== 'raid' || !raid) return false;
+  const pool = raid.loot.filter(([id]) => treasureAvailable(state, id));
   state.raid = raidId;
-  state.lootOffer = Array.from({ length: CONFIG.lootOffer }, () => pickWeighted(state, raid.loot));
+  state.lootOffer = Array.from({ length: CONFIG.lootOffer }, () => pickWeighted(state, pool));
+  for (const id of state.lootOffer) see(state, 'treasuresSeen', id);
   state.party = makeParty(state, raid);
   state.phase = 'loot';
   return true;
 }
 
 function makeParty(state, raid) {
-  const count = CONFIG.partyBase + Math.round(state.night * CONFIG.partyGrowth);
+  const count = CONFIG.partyBase + Math.round(state.night * CONFIG.partyGrowth) + state.mods.extraHeroes;
   const [[mainType, share], [otherType]] = raid.party;
   const main = Math.min(count, Math.max(1, Math.round(count * share)));
   const types = shuffle(state, [...Array(main).fill(mainType), ...Array(count - main).fill(otherType)]);
-  return types.map((type, i) => ({ type, at: 0.8 + i * CONFIG.spawnInterval + random(state) * 0.6 }));
+  const interval = CONFIG.spawnInterval * state.mods.spawnInterval;
+  const party = types.map((type, i) => ({ type, at: 0.8 + i * interval + random(state) * 0.6 }));
+
+  // Ein Erzfeind aus früheren Runs schließt sich an – spätestens in Nacht 5
+  const waiting = state.nemesesWaiting;
+  if (state.night >= 2 && waiting.length && (random(state) < META.nemesisChance || state.night >= META.nemesisForceNight)) {
+    const id = pick(state, waiting);
+    const nemesis = state.opts.nemeses.find((n) => n.id === id);
+    state.nemesesWaiting = waiting.filter((x) => x !== id);
+    party.push({ type: nemesis.type, at: 0.8 + Math.floor(random(state) * count) * interval + 0.3, nemesis: id });
+    party.sort((a, b) => a.at - b.at);
+  }
+  return party;
 }
 
 export function partySummary(state) {
-  const counts = new Map();
-  for (const { type } of state.party) counts.set(type, (counts.get(type) ?? 0) + 1);
-  return [...counts].map(([type, count]) => ({ type, count }));
+  const groups = new Map();
+  const nemeses = [];
+  for (const entry of state.party) {
+    if (entry.nemesis) {
+      const n = state.opts.nemeses.find((x) => x.id === entry.nemesis);
+      if (n) nemeses.push(n);
+    } else {
+      groups.set(entry.type, (groups.get(entry.type) ?? 0) + 1);
+    }
+  }
+  return { groups: [...groups].map(([type, count]) => ({ type, count })), nemeses };
 }
 
 export function takeLoot(state, indices) {
@@ -210,6 +344,7 @@ export function moveItem(state, from, c, r) {
   if (target && target.id === item.id && next) {
     setFrom(state, from, null);
     state.hoard[idx(c, r)] = newItem(state, next);
+    if (TREASURES[next].tier === 3) state.runLog.landmark = true;
     state.fx.push({ type: 'merge', c, r, id: next });
     return { ok: true, kind: 'merge', id: next };
   }
@@ -247,13 +382,20 @@ export function startNight(state) {
   state.heroes = [];
   state.floor = [];
   state.digs = [];
+  state.smoke = [];
+  state.guardians = state.guardians.filter((g) => walkable(state, g.c, g.r));
+  state.fallen = [];
   state.glutMax = CONFIG.glutBase + hoardItems(state).reduce((sum, { item }) => sum + (TREASURES[item.id].glut ?? 0), 0);
   state.glut = state.glutMax;
   state.glutTimer = 0;
   state.clawTimer = 0.5;
   state.nightLog = { defeated: [], escaped: 0, stolen: [], lostOnStart: lost };
+  state.runLog.nights.push({ night: state.night, cards: 0, decoyEscapes: 0, stolen: 0 });
+  state.runLog.maxHoard = Math.max(state.runLog.maxHoard, hoardItems(state).length);
   return { ok: true, lost };
 }
+
+const nightRecord = (state) => state.runLog.nights[state.runLog.nights.length - 1];
 
 export function foesLeft(state) {
   return {
@@ -272,6 +414,10 @@ function step(state, dt) {
   state.t += dt;
   updateGlut(state, dt);
   updateSpawns(state);
+  if (state.smoke.some((s) => s.until <= state.t)) {
+    state.smoke = state.smoke.filter((s) => s.until > state.t);
+    replanAll(state);
+  }
   for (const { item } of hoardItems(state)) if (item.cd > 0) item.cd = Math.max(0, item.cd - dt);
   for (const h of state.heroes) {
     updateHero(state, h, dt);
@@ -289,28 +435,31 @@ function updateGlut(state, dt) {
   }
   const rate = hoardItems(state).reduce((m, { item }) => Math.max(m, TREASURES[item.id].glutRate ?? 1), 1);
   state.glutTimer += dt * rate;
-  if (state.glutTimer >= CONFIG.glutRegenSeconds) {
-    state.glutTimer -= CONFIG.glutRegenSeconds;
+  const period = CONFIG.glutRegenSeconds + state.mods.glutRegenAdd;
+  if (state.glutTimer >= period) {
+    state.glutTimer -= period;
     state.glut += 1;
   }
 }
 
+export const glutPeriod = (state) => CONFIG.glutRegenSeconds + state.mods.glutRegenAdd;
+
 function updateSpawns(state) {
   while (state.spawnIndex < state.party.length && state.party[state.spawnIndex].at <= state.t) {
-    const { type } = state.party[state.spawnIndex++];
-    if (HEROES[type].digger) startDig(state, type);
-    else spawnHero(state, type, pick(state, ENTRANCES), false);
+    const entry = state.party[state.spawnIndex++];
+    if (HEROES[entry.type].digger) startDig(state, entry);
+    else spawnHero(state, entry, pick(state, ENTRANCES), false);
   }
   for (const dig of state.digs) {
     if (dig.at <= state.t) {
       dig.done = true;
-      spawnHero(state, dig.type, { c: dig.c, r: dig.r }, true);
+      spawnHero(state, dig.entry, { c: dig.c, r: dig.r }, true);
     }
   }
   state.digs = state.digs.filter((d) => !d.done);
 }
 
-function startDig(state, type) {
+function startDig(state, entry) {
   const blockers = hoardItems(state).filter(({ item }) => TREASURES[item.id].blocksDig);
   const candidates = DIG_AREA.filter(({ c, r }) =>
     walkable(state, c, r)
@@ -318,38 +467,55 @@ function startDig(state, type) {
     && !state.heroes.some((h) => isActive(h) && Math.floor(h.x) === c && Math.floor(h.y) === r)
     && !blockers.some((b) => Math.max(Math.abs(b.c - c), Math.abs(b.r - r)) <= TREASURES[b.item.id].blocksDig));
   if (!candidates.length) {
-    spawnHero(state, type, pick(state, ENTRANCES), false);
+    spawnHero(state, entry, pick(state, ENTRANCES), false);
     return;
   }
   const { c, r } = pick(state, candidates);
-  state.digs.push({ type, c, r, at: state.t + CONFIG.digWarning, done: false });
+  state.digs.push({ entry, c, r, at: state.t + CONFIG.digWarning, done: false });
   state.fx.push({ type: 'text', x: c + 0.5, y: r + 0.1, text: 'Es grollt im Boden …', tone: 'warn' });
 }
 
-function spawnHero(state, type, tile, dug) {
-  const def = HEROES[type];
-  const hp = Math.round(def.hp * (1 + CONFIG.heroHpGrowth * (state.night - 1)));
+function spawnHero(state, entry, tile, dug) {
+  const def = HEROES[entry.type];
+  const m = state.mods;
+  const nemesis = entry.nemesis ? state.opts.nemeses.find((n) => n.id === entry.nemesis) : null;
+  let hp = def.hp * (1 + CONFIG.heroHpGrowth * (state.night - 1)) * m.heroHp;
+  let speed = def.speed * m.heroSpeed * (entry.type === 'dieb' ? m.thiefSpeed : 1);
+  if (nemesis) {
+    hp *= 1.6 + 0.3 * (nemesis.rank - 1);
+    speed *= 1.05 ** nemesis.rank;
+  }
+  hp = Math.round(hp);
+  see(state, 'heroesSeen', entry.type);
   state.heroes.push({
     uid: state.nextUid++,
-    type,
+    type: entry.type,
     x: tile.c + 0.5,
     y: tile.r + 0.5,
     hp,
     maxHp: hp,
-    speed: def.speed,
+    speed,
     strength: def.strength,
     grabTime: def.grab,
     fireproof: !!def.fireproof,
+    caster: def.caster ?? null,
+    clever: m.clever > 0 && random(state) < m.clever,
     state: 'seek',
     target: null,
     path: [],
     retarget: 0,
     grabT: 0,
+    castT: 0,
     carry: null,
     stun: 0,
     hit: 0,
     hole: dug ? { c: tile.c, r: tile.r } : null,
+    nemesis: nemesis?.id ?? null,
+    name: nemesis?.name ?? null,
+    rank: nemesis?.rank ?? 0,
+    wears: nemesis?.treasure ?? null,
   });
+  if (nemesis) state.fx.push({ type: 'text', x: tile.c + 0.5, y: tile.r - 0.2, text: `${nemesis.name} ist zurück!`, tone: 'bad' });
 }
 
 // ── Wege ────────────────────────────────────────────────────────
@@ -391,29 +557,50 @@ function buildPath(prev, start, goal) {
 }
 
 const tileOf = (h) => ({ c: Math.floor(h.x), r: Math.floor(h.y) });
+const chebyshev = (a, b) => Math.max(Math.abs(a.c - b.c), Math.abs(a.r - b.r));
 
-// Die Glanz-Regel: Helden laufen zum glänzendsten Schatz, den sie erreichen und tragen können
+// Kluge Helden (Legende) fallen nicht auf wertlosen Tand herein – das Ei durchschauen sie aber nicht
+const ignores = (h, item) => h.clever && item.id !== 'ei' && TREASURES[item.id].value === 0;
+
+// Die Glanz-Regel: Helden laufen zum glänzendsten Schatz, den sie erreichen und tragen können.
+// Beim Mondsilberdrachen ist es umgekehrt. Magier müssen nur in Zauberweite kommen.
 function chooseTarget(state, h) {
   const { c: hc, r: hr } = tileOf(h);
   const { dist, prev, start } = bfs(state, hc, hr);
+  const inverse = ruleOf(state) === 'inverse';
   let best = null;
   const consider = (target, glanz, goal) => {
     const d = dist[goal];
     if (d < 0) return;
-    if (!best || glanz > best.glanz || (glanz === best.glanz && d < best.d)) best = { target, glanz, d, goal };
+    const score = inverse ? -glanz : glanz;
+    if (!best || score > best.score || (score === best.score && d < best.d)) best = { target, score, d, goal };
   };
   for (const { c, r, item } of hoardItems(state)) {
-    if (effWeight(state, c, r) > h.strength) continue;
+    if (effWeight(state, c, r) > h.strength || ignores(h, item)) continue;
     const glanz = effGlanz(state, c, r);
-    for (const [dc, dr] of N4) {
-      const nc = c + dc;
-      const nr = r + dr;
-      if (inside(nc, nr) && walkable(state, nc, nr)) consider({ kind: 'hoard', c, r, uid: item.uid }, glanz, idx(nc, nr));
+    const target = { kind: 'hoard', c, r, uid: item.uid };
+    if (h.caster) {
+      if (warded(state, c, r)) continue;
+      const range = h.caster.range;
+      let goal = -1;
+      for (let y = r - range; y <= r + range; y++) {
+        for (let x = c - range; x <= c + range; x++) {
+          if (!inside(x, y) || !walkable(state, x, y)) continue;
+          const i = idx(x, y);
+          if (dist[i] >= 0 && (goal < 0 || dist[i] < dist[goal])) goal = i;
+        }
+      }
+      if (goal >= 0) consider(target, glanz, goal);
+    } else {
+      for (const [dc, dr] of N4) {
+        const nc = c + dc;
+        const nr = r + dr;
+        if (inside(nc, nr) && walkable(state, nc, nr)) consider(target, glanz, idx(nc, nr));
+      }
     }
   }
   for (const f of state.floor) {
-    const d = TREASURES[f.item.id];
-    if (d.weight <= h.strength) consider({ kind: 'floor', uid: f.item.uid, c: f.c, r: f.r }, d.glanz, idx(f.c, f.r));
+    if (TREASURES[f.item.id].weight <= h.strength && !ignores(h, f.item)) consider({ kind: 'floor', uid: f.item.uid, c: f.c, r: f.r }, floorGlanz(state, f), idx(f.c, f.r));
   }
   if (!best) return null;
   return { target: best.target, path: buildPath(prev, start, best.goal) };
@@ -455,16 +642,26 @@ function moveAlong(h, speed, dt) {
 
 // ── Helden ──────────────────────────────────────────────────────
 
-function heroSurroundings(state, h) {
+// Wirkung der Schätze und Knochenwächter rund um einen Helden; liefert den Tempo-Faktor
+function applySurroundings(state, h, dt) {
   const { c, r } = tileOf(h);
   let slow = 1;
   let prick = 0;
-  for (const n of neighborItems(state, c, r)) {
+  for (const n of neighborSources(state, c, r)) {
     const d = TREASURES[n.id];
     if (d.slows) slow = Math.min(slow, d.slows);
     if (d.pricks) prick += d.pricks;
+    if (d.snare && !(n.cd > 0) && h.stun <= 0) {
+      n.cd = d.snareCooldown;
+      h.stun = d.snare;
+      h.grabT = 0;
+      h.castT = 0;
+      state.fx.push({ type: 'snare', x: h.x, y: h.y });
+    }
   }
-  return { slow, prick };
+  for (const g of state.guardians) if (Math.abs(g.c - c) + Math.abs(g.r - r) <= 1) prick += META.guardianDps;
+  if (prick) damage(state, h, prick * dt, true);
+  return slow;
 }
 
 function targetInReach(state, h) {
@@ -479,20 +676,26 @@ function targetInReach(state, h) {
   return !!f && f.c === c && f.r === r;
 }
 
+function castValid(state, h) {
+  const t = h.target;
+  if (!t || t.kind !== 'hoard') return false;
+  const item = itemAt(state, t.c, t.r);
+  return !!item && item.uid === t.uid && effWeight(state, t.c, t.r) <= h.strength && !warded(state, t.c, t.r) && chebyshev(tileOf(h), t) <= h.caster.range;
+}
+
 function updateHero(state, h, dt) {
   if (!isActive(h)) return;
   if (h.hit > 0) h.hit = Math.max(0, h.hit - dt);
-  const near = heroSurroundings(state, h);
-  if (near.prick) {
-    damage(state, h, near.prick * dt, true);
-    if (!isActive(h)) return;
-  }
+  const slow = applySurroundings(state, h, dt);
+  if (!isActive(h)) return;
   if (h.stun > 0) {
     h.stun = Math.max(0, h.stun - dt);
     h.grabT = 0;
+    h.castT = 0;
     return;
   }
-  const speed = h.speed * near.slow * (h.carry ? CONFIG.carrySpeed : 1);
+  const carrierSpeed = h.carry ? CONFIG.carrySpeed * (TREASURES[h.carry.id].carrierSpeed ?? 1) : 1;
+  const speed = h.speed * slow * carrierSpeed;
 
   if (h.state === 'seek') {
     h.retarget -= dt;
@@ -507,7 +710,15 @@ function updateHero(state, h, dt) {
       h.path = choice.path;
     }
     if (moveAlong(h, speed, dt)) {
-      if (targetInReach(state, h)) {
+      if (h.caster && h.target.kind === 'hoard') {
+        if (castValid(state, h)) {
+          h.state = 'cast';
+          h.castT = 0;
+          state.fx.push({ type: 'text', x: h.x, y: h.y - 0.7, text: 'zaubert …', tone: 'info' });
+        } else {
+          h.retarget = 0;
+        }
+      } else if (targetInReach(state, h)) {
         h.state = 'grab';
         h.grabT = 0;
         biteIfMimic(state, h);
@@ -523,6 +734,18 @@ function updateHero(state, h, dt) {
     }
     h.grabT += dt;
     if (h.grabT >= h.grabTime) take(state, h);
+  } else if (h.state === 'cast') {
+    if (!castValid(state, h)) {
+      h.state = 'seek';
+      h.castT = 0;
+      h.retarget = 0;
+      return;
+    }
+    h.castT += dt;
+    if (h.castT >= h.caster.time) {
+      state.fx.push({ type: 'teleport', c: h.target.c, r: h.target.r, x: h.x, y: h.y });
+      take(state, h);
+    }
   } else if (moveAlong(h, speed, dt)) {
     arriveAtExit(state, h);
   }
@@ -543,8 +766,13 @@ function take(state, h) {
   const t = h.target;
   let item = null;
   if (t.kind === 'hoard') {
+    const chimes = neighborSources(state, t.c, t.r).reduce((sum, n) => sum + (TREASURES[n.id].chime ?? 0), 0);
     item = itemAt(state, t.c, t.r);
     state.hoard[idx(t.c, t.r)] = null;
+    if (chimes && item) {
+      state.glut = Math.min(state.glutMax, state.glut + chimes);
+      state.fx.push({ type: 'text', x: t.c + 0.5, y: t.r, text: `+${chimes} Glut`, tone: 'warn' });
+    }
   } else {
     const i = state.floor.findIndex((f) => f.item.uid === t.uid);
     if (i >= 0) item = state.floor.splice(i, 1)[0].item;
@@ -581,13 +809,20 @@ function arriveAtExit(state, h) {
     h.state = 'left';
     return;
   }
+  const id = h.carry.id;
+  const value = TREASURES[id].value;
   h.state = 'escaped';
   state.stats.escaped += 1;
   state.nightLog.escaped += 1;
-  state.stats.stolen.push(h.carry.id);
-  state.nightLog.stolen.push(h.carry.id);
-  state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: `${TREASURES[h.carry.id].name} gestohlen`, tone: 'bad' });
-  if (h.carry.id === 'ei') {
+  state.stats.stolen.push(id);
+  state.nightLog.stolen.push(id);
+  const record = nightRecord(state);
+  if (value === 0 && id !== 'ei') record.decoyEscapes += 1;
+  else record.stolen += 1;
+  if (h.nemesis) state.runLog.nemesisEscaped.push(h.nemesis);
+  else if (id !== 'ei' && value >= META.nemesisMinValue) state.runLog.newNemeses.push({ type: h.type, treasure: id });
+  state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: `${TREASURES[id].name} gestohlen`, tone: 'bad' });
+  if (id === 'ei') {
     state.phase = 'lost';
     state.lostBy = h.type;
   }
@@ -600,6 +835,10 @@ const replanAll = (state) => {
 function damage(state, h, amount, quiet = false) {
   if (!isActive(h)) return;
   h.hp -= amount;
+  if (h.state === 'cast' && h.castT > 0) {
+    h.castT = 0;
+    if (!quiet) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.8, text: 'Zauber gestört', tone: 'good' });
+  }
   if (!quiet) {
     h.hit = 0.15;
     state.fx.push({ type: 'dmg', x: h.x, y: h.y - 0.45, text: String(Math.round(amount)) });
@@ -610,6 +849,13 @@ function damage(state, h, amount, quiet = false) {
 function kill(state, h) {
   h.hp = 0;
   dropCarry(state, h);
+  const { c, r } = tileOf(h);
+  if (h.wears) {
+    state.floor.push({ item: newItem(state, h.wears), c, r });
+    state.runLog.nemesisDefeated.push(h.nemesis);
+    state.fx.push({ type: 'text', x: h.x, y: h.y - 0.9, text: `${h.name} besiegt!`, tone: 'good' });
+  }
+  if (ruleOf(state) === 'guardians') state.fallen.push({ c, r });
   h.state = 'dead';
   state.stats.defeated += 1;
   state.nightLog.defeated.push(h.type);
@@ -659,15 +905,31 @@ function updateClaw(state, dt) {
   damage(state, best, CONFIG.claw.damage * power(state));
 }
 
+function spend(state, card) {
+  state.glut -= card.cost;
+  nightRecord(state).cards += 1;
+}
+
+function interrupt(h) {
+  h.path = [];
+  h.grabT = 0;
+  h.castT = 0;
+  if (h.state === 'grab' || h.state === 'cast') {
+    h.state = 'seek';
+    h.retarget = 0;
+  }
+}
+
 export function playCard(state, cardId, target = null) {
   const card = CARD_BY_ID[cardId];
   if (state.phase !== 'night' || !card) return { ok: false, reason: '' };
+  if (!state.opts.cards.includes(cardId)) return { ok: false, reason: 'Diese Karte hast du nicht dabei.' };
   if (state.glut < card.cost) return { ok: false, reason: 'Zu wenig Glut.' };
   const pw = power(state);
 
   if (card.id === 'feuer') {
     if (!target || target.c == null) return { ok: false, reason: 'Wähle ein Feld für den Feueratem.' };
-    state.glut -= card.cost;
+    spend(state, card);
     state.fx.push({ type: 'fire', c: target.c, r: target.r });
     for (const h of activeHeroes(state)) {
       if (Math.abs(h.x - (target.c + 0.5)) > 1.5 || Math.abs(h.y - (target.r + 0.5)) > 1.5) continue;
@@ -681,22 +943,21 @@ export function playCard(state, cardId, target = null) {
     const h = state.heroes.find((x) => x.uid === target?.uid && isActive(x));
     if (!h) return { ok: false, reason: 'Tippe direkt auf einen Helden.' };
     if (distToDragon(h.x, h.y) > card.range) return { ok: false, reason: 'So weit reicht dein Maul nicht.' };
-    state.glut -= card.cost;
+    spend(state, card);
     state.fx.push({ type: 'bite', x: h.x, y: h.y });
     dropCarry(state, h);
     damage(state, h, card.damage * pw);
     if (isActive(h)) {
+      interrupt(h);
       h.state = 'seek';
       h.target = null;
-      h.path = [];
-      h.grabT = 0;
       h.retarget = 0;
     }
     return { ok: true };
   }
 
   if (card.id === 'fluegel') {
-    state.glut -= card.cost;
+    spend(state, card);
     state.fx.push({ type: 'wing' });
     for (const h of activeHeroes(state)) {
       const dx = h.x - DRAGON_CENTER.x;
@@ -706,8 +967,7 @@ export function playCard(state, cardId, target = null) {
       dropCarry(state, h);
       push(state, h, dx / (d || 1), dy / (d || 1), card.push);
       h.stun = Math.max(h.stun, card.stun);
-      h.grabT = 0;
-      h.path = [];
+      interrupt(h);
       if (h.state !== 'leave') {
         h.state = 'seek';
         h.target = null;
@@ -718,12 +978,45 @@ export function playCard(state, cardId, target = null) {
   }
 
   if (card.id === 'bruellen') {
-    state.glut -= card.cost;
+    spend(state, card);
     state.fx.push({ type: 'roar' });
     for (const h of activeHeroes(state)) {
       h.stun = Math.max(h.stun, card.stun);
-      h.grabT = 0;
-      if (h.state === 'grab') h.state = 'seek';
+      interrupt(h);
+    }
+    return { ok: true };
+  }
+
+  if (card.id === 'rauch') {
+    if (!target || target.c == null) return { ok: false, reason: 'Wähle ein Feld für die Rauchwolke.' };
+    spend(state, card);
+    state.smoke.push({ c: target.c, r: target.r, until: state.t + card.duration });
+    state.fx.push({ type: 'smoke', c: target.c, r: target.r });
+    replanAll(state);
+    return { ok: true };
+  }
+
+  if (card.id === 'schwanz') {
+    spend(state, card);
+    state.fx.push({ type: 'tail' });
+    for (const h of activeHeroes(state)) {
+      if (distToDragon(h.x, h.y) > card.range) continue;
+      const dx = h.x - DRAGON_CENTER.x;
+      const dy = h.y - DRAGON_CENTER.y;
+      const d = Math.hypot(dx, dy) || 1;
+      push(state, h, dx / d, dy / d, card.push);
+      damage(state, h, card.damage * pw);
+      if (isActive(h)) interrupt(h);
+    }
+    return { ok: true };
+  }
+
+  if (card.id === 'glutregen') {
+    spend(state, card);
+    state.fx.push({ type: 'rain' });
+    for (const h of activeHeroes(state)) {
+      if (h.fireproof) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'feuerfest', tone: 'info' });
+      else damage(state, h, card.damage * pw);
     }
     return { ok: true };
   }
@@ -747,13 +1040,28 @@ function endNight(state) {
   // Was auf dem Boden liegt, sammelt der Drache am Morgen wieder ein
   for (const f of state.floor) if (!placeNear(state, f.item, f.c, f.r)) state.tray.push(f.item);
   state.floor = [];
+  state.smoke = [];
 
   const drops = [];
   for (const type of state.nightLog.defeated) {
     const def = HEROES[type];
-    if (def.loot && random(state) < def.lootChance) drops.push(def.loot);
+    if (def.loot && random(state) < def.lootChance * state.mods.lootChance) drops.push(def.loot);
   }
   state.morningLoot = shuffle(state, drops).slice(0, CONFIG.morningLootMax);
+  for (const id of state.morningLoot) see(state, 'treasuresSeen', id);
+
+  // Knochendrache: Wer heute fiel, steht morgen Nacht als Wächter wieder auf
+  if (ruleOf(state) === 'guardians') {
+    const seen = new Set();
+    state.guardians = state.fallen.slice().reverse().filter((g) => {
+      const key = `${g.c},${g.r}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, META.guardianMax);
+  }
+  state.fallen = [];
+
   state.stats.nightsSurvived += 1;
   state.lastNight = {
     night: state.night,
@@ -765,9 +1073,9 @@ function endNight(state) {
   state.heroes = [];
   state.digs = [];
   state.party = [];
-  if (state.night >= CONFIG.nights) {
+  if (state.nights && state.night >= state.nights) {
     state.phase = 'won';
-    state.species = computeSpecies(state);
+    state.species = computeHatch(state);
   } else {
     state.phase = 'morning';
   }
@@ -783,13 +1091,21 @@ export function takeMorningLoot(state, indices) {
   return true;
 }
 
-function computeSpecies(state) {
-  const score = Object.fromEntries(Object.keys(SPECIES).map((k) => [k, 0]));
-  for (const { item } of hoardItems(state)) {
-    const family = TREASURES[item.id].family;
-    if (family in score) score[family] += SPECIES[family].weight;
+// Welche Drachenart schlüpft: zuerst die geheime Regel, dann zählen die acht Felder rund um das Ei
+export function computeHatch(state) {
+  const egg = hoardItems(state).find(({ item }) => item.id === 'ei');
+  if (!egg) return 'gold';
+  const fakes = plainNeighbors(state, egg.c, egg.r).filter((n) => TREASURES[n.id].family === 'tand' && TREASURES[n.id].value === 0).length;
+  if (fakes >= 2) return 'mond';
+  const count = {};
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const item = (dc || dr) ? itemAt(state, egg.c + dc, egg.r + dr) : null;
+      if (item) count[TREASURES[item.id].family] = (count[TREASURES[item.id].family] ?? 0) + 1;
+    }
   }
-  let best = 'gold';
-  for (const k of Object.keys(score)) if (score[k] > score[best]) best = k;
-  return best;
+  let best = null;
+  for (const family of HATCH_PRIORITY) if ((count[family] ?? 0) >= HATCH_MIN && (!best || count[family] > count[best])) best = family;
+  if (!best) return 'gold';
+  return SPECIES_ORDER.find((id) => SPECIES[id].family === best) ?? 'gold';
 }

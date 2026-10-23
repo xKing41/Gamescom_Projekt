@@ -116,11 +116,14 @@ function chalice(ctx, scale, gems) {
   ctx.restore();
 }
 
-function faceted(ctx) {
+const RUBY = ['#ff8a96', '#d61f3c', '#6e0a1c', '#4a0612', 'rgba(255,200,210,.55)'];
+const SAPPHIRE = ['#9cc8ff', '#2f6ee0', '#13306e', '#0b1d44', 'rgba(200,225,255,.55)'];
+
+function faceted(ctx, colors = RUBY) {
   const g = ctx.createLinearGradient(-20, -20, 20, 24);
-  g.addColorStop(0, '#ff8a96');
-  g.addColorStop(0.5, '#d61f3c');
-  g.addColorStop(1, '#6e0a1c');
+  g.addColorStop(0, colors[0]);
+  g.addColorStop(0.5, colors[1]);
+  g.addColorStop(1, colors[2]);
   ctx.beginPath();
   ctx.moveTo(-24, -6);
   ctx.lineTo(-12, -20);
@@ -130,7 +133,7 @@ function faceted(ctx) {
   ctx.closePath();
   ctx.fillStyle = g;
   ctx.fill();
-  ctx.strokeStyle = '#4a0612';
+  ctx.strokeStyle = colors[3];
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.beginPath();
@@ -142,7 +145,7 @@ function faceted(ctx) {
   ctx.moveTo(12, -20);
   ctx.lineTo(6, -6);
   ctx.lineTo(0, 26);
-  ctx.strokeStyle = 'rgba(255,200,210,.55)';
+  ctx.strokeStyle = colors[4];
   ctx.lineWidth = 1.3;
   ctx.stroke();
   ctx.beginPath();
@@ -172,6 +175,54 @@ function cube(ctx, x, y, s, light) {
     ctx.lineWidth = 1.4;
     ctx.stroke();
   }
+}
+
+function crown(ctx, scale, imperial) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = GOLD[3];
+  ctx.lineWidth = 2;
+  if (imperial) {
+    ctx.beginPath();
+    ctx.moveTo(-18, -2);
+    ctx.quadraticCurveTo(0, -42, 18, -2);
+    ctx.strokeStyle = GOLD[2];
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -34, 6, 0, TAU);
+    ctx.fillStyle = goldFill(ctx, -40, -28);
+    ctx.fill();
+    ctx.strokeStyle = GOLD[3];
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.fillStyle = goldFill(ctx, -24, 20);
+  ctx.beginPath();
+  ctx.moveTo(-26, 16);
+  ctx.lineTo(-27, -12);
+  ctx.lineTo(-13, 2);
+  ctx.lineTo(0, -20);
+  ctx.lineTo(13, 2);
+  ctx.lineTo(27, -12);
+  ctx.lineTo(26, 16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  roundRect(ctx, -28, 8, 56, 12, 3);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = GOLD[0];
+  for (const [x, y] of [[-27, -13], [0, -21], [27, -13]]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+  gem(ctx, -15, 14, 4, '#2f7de1');
+  gem(ctx, 0, 14, 4.6, '#e2384f');
+  gem(ctx, 15, 14, 4, '#2fbf71');
+  ctx.restore();
 }
 
 const TREASURE_PAINTERS = {
@@ -471,6 +522,237 @@ const TREASURE_PAINTERS = {
     }
     ctx.stroke();
   },
+  krone(ctx) {
+    crown(ctx, 1, false);
+  },
+  kaiserkrone(ctx) {
+    crown(ctx, 1.1, true);
+  },
+  saphir(ctx) {
+    faceted(ctx, SAPPHIRE);
+  },
+  saphirauge(ctx) {
+    const g = ctx.createRadialGradient(-8, -10, 3, 0, 0, 30);
+    g.addColorStop(0, '#cfe4ff');
+    g.addColorStop(0.45, '#2f6ee0');
+    g.addColorStop(1, '#0b1d44');
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 28, 22, 0, 0, TAU);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = GOLD[2];
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 4, 15, 0, 0, TAU);
+    ctx.fillStyle = '#071027';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(-11, -9, 5, 3, -0.5, 0, TAU);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fill();
+  },
+  narrenkrone(ctx) {
+    const colors = ['#8e3fd0', '#2fae6a', '#d0453f'];
+    for (let i = 0; i < 3; i++) {
+      const x = -20 + i * 20;
+      ctx.beginPath();
+      ctx.moveTo(x - 9, 8);
+      ctx.quadraticCurveTo(x - 16 + i * 8, -26, x + (i - 1) * 14, -30 + Math.abs(i - 1) * 6);
+      ctx.quadraticCurveTo(x + 2, -10, x + 9, 8);
+      ctx.closePath();
+      ctx.fillStyle = colors[i];
+      ctx.fill();
+      ctx.strokeStyle = '#2a1430';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x + (i - 1) * 14, -30 + Math.abs(i - 1) * 6, 5, 0, TAU);
+      ctx.fillStyle = goldFill(ctx, -36, -20);
+      ctx.fill();
+      ctx.strokeStyle = GOLD[3];
+      ctx.stroke();
+    }
+    ctx.fillStyle = goldFill(ctx, 6, 22);
+    roundRect(ctx, -30, 6, 60, 14, 4);
+    ctx.fill();
+    ctx.strokeStyle = GOLD[3];
+    ctx.stroke();
+    gem(ctx, -16, 13, 4, '#ffd34d');
+    gem(ctx, 0, 13, 4, '#ff6ad5');
+    gem(ctx, 16, 13, 4, '#6ad5ff');
+  },
+  baerenfalle(ctx) {
+    // Offene Falle von vorn: zwei Bügel mit Zähnen, Federn an den Enden, Kette zum Pflock
+    ctx.strokeStyle = '#6b7080';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(34, 18);
+    ctx.quadraticCurveTo(40, 26, 32, 32);
+    ctx.stroke();
+    ctx.fillStyle = '#4a4f5a';
+    ctx.fillRect(27, 30, 9, 4);
+    ctx.fillStyle = '#2b2e36';
+    roundRect(ctx, -36, 14, 72, 7, 3);
+    ctx.fill();
+    for (const side of [-1, 1]) {
+      const cx = side * 16;
+      ctx.beginPath();
+      ctx.arc(cx, 17, 15, Math.PI, 0);
+      ctx.strokeStyle = '#b4bac6';
+      ctx.lineWidth = 4.5;
+      ctx.stroke();
+      ctx.fillStyle = '#eef0f4';
+      for (let k = 1; k < 6; k++) {
+        const a = Math.PI + (k / 6) * Math.PI;
+        const x = cx + Math.cos(a) * 15;
+        const y = 17 + Math.sin(a) * 15;
+        const ix = cx + Math.cos(a) * 8;
+        const iy = 17 + Math.sin(a) * 8;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.sin(a) * 2.6, y - Math.cos(a) * 2.6);
+        ctx.lineTo(ix, iy);
+        ctx.lineTo(x - Math.sin(a) * 2.6, y + Math.cos(a) * 2.6);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.ellipse(side * 37, 17, 4, 7, 0, 0, TAU);
+      ctx.strokeStyle = '#8f96a3';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#7a808c';
+    roundRect(ctx, -7, 10, 14, 5, 2);
+    ctx.fill();
+  },
+  glocke(ctx) {
+    const g = ctx.createLinearGradient(-22, 0, 22, 0);
+    g.addColorStop(0, '#8b93a4');
+    g.addColorStop(0.4, '#f2f4f8');
+    g.addColorStop(1, '#7a8294');
+    ctx.beginPath();
+    ctx.moveTo(-6, -28);
+    ctx.quadraticCurveTo(-20, -24, -20, -2);
+    ctx.quadraticCurveTo(-22, 14, -30, 20);
+    ctx.lineTo(30, 20);
+    ctx.quadraticCurveTo(22, 14, 20, -2);
+    ctx.quadraticCurveTo(20, -24, 6, -28);
+    ctx.closePath();
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = '#3d4352';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -31, 5, 0, TAU);
+    ctx.strokeStyle = '#8b93a4';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 25, 6, 0, TAU);
+    ctx.fillStyle = '#5f677a';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(230,185,79,.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-16, 8);
+    ctx.lineTo(16, 8);
+    ctx.stroke();
+  },
+  bannstein(ctx, time) {
+    ctx.beginPath();
+    ctx.moveTo(-18, 28);
+    ctx.lineTo(-22, -16);
+    ctx.quadraticCurveTo(-18, -32, 0, -33);
+    ctx.quadraticCurveTo(18, -32, 22, -16);
+    ctx.lineTo(18, 28);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(-20, -30, 20, 28);
+    g.addColorStop(0, '#9a96a2');
+    g.addColorStop(1, '#4c4855');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = '#2b2830';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const glow = 0.6 + 0.4 * Math.sin(time * 2);
+    ctx.strokeStyle = `rgba(120,200,255,${glow})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, -22);
+    ctx.lineTo(0, 16);
+    ctx.moveTo(-9, -12);
+    ctx.lineTo(9, 0);
+    ctx.moveTo(9, -12);
+    ctx.lineTo(-9, 0);
+    ctx.moveTo(-8, 16);
+    ctx.lineTo(8, 16);
+    ctx.stroke();
+  },
+  steinwaechter(ctx) {
+    ctx.fillStyle = '#4a4650';
+    roundRect(ctx, -26, 22, 52, 14, 3);
+    ctx.fill();
+    const g = ctx.createLinearGradient(-20, -40, 20, 24);
+    g.addColorStop(0, '#a8a4ae');
+    g.addColorStop(1, '#5a5662');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#2b2830';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-16, 22);
+    ctx.lineTo(-18, -6);
+    ctx.lineTo(-10, -14);
+    ctx.lineTo(10, -14);
+    ctx.lineTo(18, -6);
+    ctx.lineTo(16, 22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -24, 11, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ff8a3d';
+    ctx.fillRect(-6, -26, 4, 3);
+    ctx.fillRect(2, -26, 4, 3);
+    ctx.strokeStyle = '#d5d8de';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(20, 18);
+    ctx.lineTo(28, -32);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(110,150,90,.6)';
+    ctx.beginPath();
+    ctx.arc(-12, 18, 5, 0, TAU);
+    ctx.arc(10, -10, 4, 0, TAU);
+    ctx.fill();
+  },
+  stab(ctx, time) {
+    ctx.rotate(0.5);
+    ctx.fillStyle = '#6b4424';
+    ctx.strokeStyle = '#2e1a0c';
+    ctx.lineWidth = 2;
+    ctx.fillRect(-3, -22, 6, 56);
+    ctx.strokeRect(-3, -22, 6, 56);
+    ctx.strokeStyle = '#8a5a33';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, -22);
+    ctx.quadraticCurveTo(-14, -30, -8, -40);
+    ctx.moveTo(0, -22);
+    ctx.quadraticCurveTo(14, -30, 8, -40);
+    ctx.stroke();
+    const pulse = 0.6 + 0.4 * Math.sin(time * 3);
+    const g = ctx.createRadialGradient(0, -34, 1, 0, -34, 16);
+    g.addColorStop(0, `rgba(240,200,255,${pulse})`);
+    g.addColorStop(0.5, 'rgba(160,90,255,.7)');
+    g.addColorStop(1, 'rgba(160,90,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, -34, 16, 0, TAU);
+    ctx.fill();
+  },
   ei(ctx, time) {
     const pulse = 0.5 + 0.5 * Math.sin(time * 2.2);
     const glow = ctx.createRadialGradient(0, 2, 6, 0, 2, 44);
@@ -672,6 +954,133 @@ const HERO_PAINTERS = {
   },
 };
 
+HERO_PAINTERS.soeldner = (ctx) => {
+  ctx.strokeStyle = '#c9ced9';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(18, 24);
+  ctx.lineTo(24, -10);
+  ctx.stroke();
+  ctx.fillStyle = '#6a4a2a';
+  ctx.fillRect(16, 10, 10, 3);
+  body(ctx, '#6e4a38', 18);
+  ctx.fillStyle = '#3a2a20';
+  ctx.fillRect(-12, 6, 24, 5);
+  ctx.fillStyle = '#e6b94f';
+  ctx.fillRect(-3, 6, 6, 5);
+  head(ctx, '#d4a07a');
+  ctx.fillStyle = '#8e939e';
+  ctx.beginPath();
+  ctx.ellipse(0, -24, 19, 5, 0, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, -24, 11, Math.PI, 0);
+  ctx.fill();
+  ctx.strokeStyle = '#4a5060';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.strokeStyle = '#7a2a20';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-6, -12);
+  ctx.lineTo(-2, -8);
+  ctx.stroke();
+};
+
+HERO_PAINTERS.magier = (ctx) => {
+  ctx.strokeStyle = '#6b4424';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-20, 30);
+  ctx.lineTo(-24, -24);
+  ctx.stroke();
+  ctx.fillStyle = '#c8a0ff';
+  ctx.beginPath();
+  ctx.arc(-24, -27, 5, 0, TAU);
+  ctx.fill();
+  body(ctx, '#3a2f6e', 18);
+  ctx.fillStyle = '#ffe9a8';
+  for (const [x, y] of [[-6, 4], [7, 12], [-2, 20], [9, -1]]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 1.6, 0, TAU);
+    ctx.fill();
+  }
+  head(ctx, '#e0b896');
+  ctx.fillStyle = '#d8d0c4';
+  ctx.beginPath();
+  ctx.moveTo(-8, -12);
+  ctx.quadraticCurveTo(0, 6, 8, -12);
+  ctx.fill();
+  ctx.fillStyle = '#3a2f6e';
+  ctx.beginPath();
+  ctx.moveTo(-16, -22);
+  ctx.lineTo(16, -22);
+  ctx.lineTo(4, -48);
+  ctx.quadraticCurveTo(0, -42, -2, -40);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#1c1638';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+};
+
+// Knochenwächter des Knochendrachen
+export function drawGuardian(ctx, x, y, size, time, alpha = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 100, size / 100);
+  ctx.globalAlpha = alpha;
+  const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 44);
+  aura.addColorStop(0, `rgba(160,255,120,${0.18 + 0.08 * Math.sin(time * 3)})`);
+  aura.addColorStop(1, 'rgba(160,255,120,0)');
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.arc(0, 0, 44, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = '#ece6d6';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(0, 16);
+  ctx.moveTo(0, 16);
+  ctx.lineTo(-8, 30);
+  ctx.moveTo(0, 16);
+  ctx.lineTo(8, 30);
+  ctx.moveTo(0, -2);
+  ctx.lineTo(-14, 10);
+  ctx.moveTo(0, -2);
+  ctx.lineTo(16, -14);
+  ctx.stroke();
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(0, 1 + i * 5, 9 - i, 2.5, 0, 0, Math.PI);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#b9bec8';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(16, -14);
+  ctx.lineTo(26, -36);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, -16, 11, 0, TAU);
+  ctx.fillStyle = '#ece6d6';
+  ctx.fill();
+  ctx.fillStyle = '#1a1714';
+  ctx.beginPath();
+  ctx.arc(-4, -17, 3, 0, TAU);
+  ctx.arc(4, -17, 3, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#b6ff8a';
+  ctx.beginPath();
+  ctx.arc(-4, -17, 1.3, 0, TAU);
+  ctx.arc(4, -17, 1.3, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function drawHero(ctx, type, x, y, size, opts = {}) {
   ctx.save();
   ctx.translate(x, y);
@@ -695,7 +1104,16 @@ export function drawHero(ctx, type, x, y, size, opts = {}) {
 
 // ── Drache ──────────────────────────────────────────────────────
 
-function wing(ctx, side, spread, flap) {
+// Bronze-Drache, falls keine Farben übergeben werden
+const DEFAULT_PALETTE = {
+  body: ['#c08a4a', '#7b4a24', '#3e2413'],
+  wing: ['#6a3326', '#2d1512', '#80452c', '#9a5a36'],
+  head: ['#a87040', '#5d361b'],
+  horn: '#e8dcc0',
+  eye: '#ffb347',
+};
+
+function wing(ctx, side, spread, flap, pal) {
   ctx.save();
   ctx.scale(side, 1);
   ctx.translate(58, -38);
@@ -720,14 +1138,14 @@ function wing(ctx, side, spread, flap) {
   ctx.quadraticCurveTo(6, 22, 0, 12);
   ctx.closePath();
   const g = ctx.createLinearGradient(0, -lift, 0, 40);
-  g.addColorStop(0, '#6a3326');
-  g.addColorStop(1, '#2d1512');
+  g.addColorStop(0, pal.wing[0]);
+  g.addColorStop(1, pal.wing[1]);
   ctx.fillStyle = g;
   ctx.fill();
-  ctx.strokeStyle = '#80452c';
+  ctx.strokeStyle = pal.wing[2];
   ctx.lineWidth = 4;
   ctx.stroke();
-  ctx.strokeStyle = '#9a5a36';
+  ctx.strokeStyle = pal.wing[3];
   ctx.lineWidth = 6;
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -741,8 +1159,13 @@ function wing(ctx, side, spread, flap) {
   ctx.restore();
 }
 
+// Feste Stellen für die Narben der Legende, damit sie nicht springen
+const SCARS = [[-60, -40, 0.6], [40, -50, -0.5], [-20, -10, 0.9], [70, -12, 0.3], [-85, -15, -0.7], [10, -58, 0.2], [-40, 8, -0.4], [55, 10, 0.8], [-70, -55, 0.1], [85, -40, -0.9]];
+
 // o.awake: Augen offen · o.spread: Flügel 0–1 · o.mouth: Glut im Maul 0–1 · o.shake: Kopfschütteln 0–1
+// o.palette: Farben der Drachenart · o.scars: Narben der Legende (0–10)
 export function drawDragon(ctx, x, y, tile, time, o = {}) {
+  const pal = o.palette ?? DEFAULT_PALETTE;
   const breathe = 1 + Math.sin(time * 1.4) * 0.015;
   ctx.save();
   ctx.translate(x, y);
@@ -751,16 +1174,16 @@ export function drawDragon(ctx, x, y, tile, time, o = {}) {
   ctx.lineCap = 'round';
 
   // Schwanz
-  ctx.strokeStyle = '#3b2213';
+  ctx.strokeStyle = pal.body[2];
   ctx.lineWidth = 28;
   ctx.beginPath();
   ctx.moveTo(70, -20);
   ctx.bezierCurveTo(170, -30, 220, -70, 290, -48);
   ctx.stroke();
-  ctx.strokeStyle = '#6b4020';
+  ctx.strokeStyle = pal.body[1];
   ctx.lineWidth = 10;
   ctx.stroke();
-  ctx.fillStyle = '#3b2213';
+  ctx.fillStyle = pal.body[2];
   ctx.beginPath();
   ctx.moveTo(280, -62);
   ctx.lineTo(322, -44);
@@ -770,24 +1193,24 @@ export function drawDragon(ctx, x, y, tile, time, o = {}) {
 
   const flap = Math.sin(time * 1.1) * 0.03;
   const spread = o.spread ?? 0.3;
-  wing(ctx, -1, spread, flap);
-  wing(ctx, 1, spread, flap);
+  wing(ctx, -1, spread, flap, pal);
+  wing(ctx, 1, spread, flap, pal);
 
   // Körper
   ctx.save();
   ctx.scale(breathe, breathe);
   const g = ctx.createRadialGradient(-30, -50, 10, 0, -20, 130);
-  g.addColorStop(0, '#c08a4a');
-  g.addColorStop(0.55, '#7b4a24');
-  g.addColorStop(1, '#3e2413');
+  g.addColorStop(0, pal.body[0]);
+  g.addColorStop(0.55, pal.body[1]);
+  g.addColorStop(1, pal.body[2]);
   ctx.beginPath();
-  ctx.ellipse(0, -22, 115, 64, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -22, 115, 64, 0, 0, TAU);
   ctx.fillStyle = g;
   ctx.fill();
-  ctx.strokeStyle = '#2a170b';
+  ctx.strokeStyle = 'rgba(20,10,5,.75)';
   ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,220,160,.13)';
+  ctx.strokeStyle = 'rgba(255,235,200,.14)';
   ctx.lineWidth = 2;
   for (let row = 0; row < 4; row++) {
     const yy = -64 + row * 18;
@@ -798,15 +1221,27 @@ export function drawDragon(ctx, x, y, tile, time, o = {}) {
       ctx.stroke();
     }
   }
+  const scars = Math.min(o.scars ?? 0, SCARS.length);
+  ctx.strokeStyle = 'rgba(255,235,220,.55)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < scars; i++) {
+    const [sx, sy, a] = SCARS[i];
+    ctx.beginPath();
+    ctx.moveTo(sx - Math.cos(a) * 12, sy - Math.sin(a) * 12);
+    ctx.lineTo(sx + Math.cos(a) * 12, sy + Math.sin(a) * 12);
+    ctx.moveTo(sx - 3, sy - 5);
+    ctx.lineTo(sx + 1, sy + 1);
+    ctx.stroke();
+  }
   ctx.restore();
 
   // Vorderbeine mit Krallen
   for (const side of [-1, 1]) {
     ctx.beginPath();
-    ctx.ellipse(side * 98, 26, 26, 18, side * 0.3, 0, Math.PI * 2);
-    ctx.fillStyle = '#6b4020';
+    ctx.ellipse(side * 98, 26, 26, 18, side * 0.3, 0, TAU);
+    ctx.fillStyle = pal.body[1];
     ctx.fill();
-    ctx.strokeStyle = '#2a170b';
+    ctx.strokeStyle = 'rgba(20,10,5,.75)';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = '#efe6d2';
@@ -822,21 +1257,23 @@ export function drawDragon(ctx, x, y, tile, time, o = {}) {
   // Kopf, zum Hort hin
   ctx.save();
   if (o.shake) ctx.rotate(Math.sin(time * 40) * 0.05 * o.shake);
+  // Ab Legende 5 wachsen die Hörner
+  const hornLen = scars >= 5 ? 1.3 : 1;
   for (const side of [-1, 1]) {
     ctx.beginPath();
     ctx.moveTo(side * 26, 22);
-    ctx.quadraticCurveTo(side * 54, 8, side * 66, -30);
+    ctx.quadraticCurveTo(side * 54 * hornLen, 8 - (hornLen - 1) * 30, side * 66 * hornLen, -30 * hornLen);
     ctx.quadraticCurveTo(side * 48, 0, side * 36, 30);
     ctx.closePath();
-    ctx.fillStyle = '#e8dcc0';
+    ctx.fillStyle = pal.horn;
     ctx.fill();
-    ctx.strokeStyle = '#8a7a5a';
+    ctx.strokeStyle = 'rgba(60,45,25,.7)';
     ctx.lineWidth = 2;
     ctx.stroke();
   }
   const hg = ctx.createLinearGradient(0, 10, 0, 100);
-  hg.addColorStop(0, '#a87040');
-  hg.addColorStop(1, '#5d361b');
+  hg.addColorStop(0, pal.head[0]);
+  hg.addColorStop(1, pal.head[1]);
   ctx.beginPath();
   ctx.moveTo(-40, 10);
   ctx.bezierCurveTo(-50, 50, -36, 86, -16, 96);
@@ -845,43 +1282,43 @@ export function drawDragon(ctx, x, y, tile, time, o = {}) {
   ctx.closePath();
   ctx.fillStyle = hg;
   ctx.fill();
-  ctx.strokeStyle = '#2e190c';
+  ctx.strokeStyle = 'rgba(20,10,5,.8)';
   ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,220,170,.18)';
+  ctx.strokeStyle = 'rgba(255,235,200,.18)';
   ctx.lineWidth = 6;
   ctx.beginPath();
   ctx.moveTo(0, 22);
   ctx.lineTo(0, 82);
   ctx.stroke();
-  ctx.fillStyle = '#1b0e07';
+  ctx.fillStyle = 'rgba(15,8,4,.9)';
   for (const side of [-1, 1]) {
     ctx.beginPath();
-    ctx.ellipse(side * 9, 88, 4, 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(side * 9, 88, 4, 2.5, 0, 0, TAU);
     ctx.fill();
   }
   for (const side of [-1, 1]) {
     if (o.awake) {
       ctx.save();
-      ctx.shadowColor = '#ff8a3d';
+      ctx.shadowColor = pal.eye;
       ctx.shadowBlur = tile * 0.25;
       ctx.beginPath();
-      ctx.ellipse(side * 21, 50, 10, 6, side * 0.25, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffb347';
+      ctx.ellipse(side * 21, 50, 10, 6, side * 0.25, 0, TAU);
+      ctx.fillStyle = pal.eye;
       ctx.fill();
       ctx.restore();
-      ctx.fillStyle = '#2a0d00';
+      ctx.fillStyle = '#1a0800';
       ctx.beginPath();
-      ctx.ellipse(side * 21, 50, 2, 5.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(side * 21, 50, 2, 5.5, 0, 0, TAU);
       ctx.fill();
     } else {
-      ctx.strokeStyle = '#2e190c';
+      ctx.strokeStyle = 'rgba(20,10,5,.85)';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(side * 21, 46, 9, 0.2 * Math.PI, 0.8 * Math.PI);
       ctx.stroke();
     }
-    ctx.strokeStyle = '#3a200e';
+    ctx.strokeStyle = 'rgba(30,15,6,.8)';
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(side * 10, 38);
@@ -895,25 +1332,34 @@ export function drawDragon(ctx, x, y, tile, time, o = {}) {
     mg.addColorStop(1, 'rgba(255,90,40,0)');
     ctx.fillStyle = mg;
     ctx.beginPath();
-    ctx.arc(0, 98, 46 * o.mouth, 0, Math.PI * 2);
+    ctx.arc(0, 98, 46 * o.mouth, 0, TAU);
     ctx.fill();
   }
   ctx.restore();
   ctx.restore();
 }
 
-// Kleine Bilder für die Bedienleiste, einmal gezeichnet und zwischengespeichert
+// Kleine Bilder für die Tafel, einmal gezeichnet und zwischengespeichert.
+// kind: 't' Schatz · 'hero' Held · 'guardian' Knochenwächter · 'dragon' Drache (id = Farbpalette)
 const iconCache = new Map();
 
-export function iconURL(kind, id, px = 96) {
-  const key = `${kind}:${id}:${px}`;
+export function iconURL(kind, id, px = 96, { silhouette = false, palette = null, scars = 0 } = {}) {
+  const key = `${kind}:${id}:${px}:${silhouette}:${scars}`;
   if (iconCache.has(key)) return iconCache.get(key);
   const canvas = document.createElement('canvas');
-  canvas.width = px;
-  canvas.height = px;
+  const wide = kind === 'dragon';
+  canvas.width = wide ? px * 2 : px;
+  canvas.height = wide ? Math.round(px * 0.8) : px;
   const ctx = canvas.getContext('2d');
   if (kind === 'hero') drawHero(ctx, id, px / 2, px / 2 - px * 0.02, px * 1.2);
+  else if (kind === 'guardian') drawGuardian(ctx, px / 2, px / 2, px * 1.1, 0);
+  else if (wide) drawDragon(ctx, px, px * 0.36, px / 3.2, 0, { awake: true, spread: 0.35, palette, scars });
   else drawTreasure(ctx, id, px / 2, px / 2, px * 1.05, 0);
+  if (silhouette) {
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = '#4a3f52';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   const url = canvas.toDataURL('image/png');
   iconCache.set(key, url);
   return url;

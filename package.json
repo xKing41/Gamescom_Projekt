@@ -1,13 +1,13 @@
 {
   "name": "hort",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Hort – Prototyp: Du bist der Drache, dein Goldhaufen ist dein Inventar.",
   "type": "module",
   "scripts": {
     "dev": "node tools/serve.mjs",
     "build": "node tools/build.mjs",
-    "test": "node tools/balance.mjs",
+    "test": "node tools/meta-test.mjs && node tools/balance.mjs",
     "e2e": "node tools/e2e.mjs"
   },
   "devDependencies": {

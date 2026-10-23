@@ -2,14 +2,14 @@
 // Liest nur den Spielzustand und die Ansicht – verändert nichts daran.
 
 import { COLS, ROWS, MAP, HOARD_CELLS, DRAGON_CENTER, inside } from './map.js';
-import { TREASURES, CARD_BY_ID } from './data.js';
+import { TREASURES, CARD_BY_ID, SPECIES } from './data.js';
 import { effGlanz, effWeight, itemAt, isActive, distToDragon, DAY_PHASES } from './sim.js';
-import { drawTreasure, drawHero, drawDragon, drawSparkle } from './icons.js';
+import { drawTreasure, drawHero, drawDragon, drawSparkle, drawGuardian } from './icons.js';
 
 const TAU = Math.PI * 2;
 const FONT = '"Alegreya Sans", "Segoe UI", system-ui, sans-serif';
 const TONES = { warn: '#ffcf6b', bad: '#ff6b6b', good: '#9be38f', info: '#a9c1d9' };
-const DURATION = { fire: 0.75, claw: 0.25, bite: 0.4, wing: 0.6, roar: 0.8, merge: 0.7, mimik: 0.5, text: 1.4, dmg: 0.8, death: 0.7, grab: 0.5 };
+const DURATION = { fire: 0.75, claw: 0.25, bite: 0.4, wing: 0.6, roar: 0.8, merge: 0.7, mimik: 0.5, text: 1.4, dmg: 0.8, death: 0.7, grab: 0.5, snare: 0.6, teleport: 0.8, smoke: 0.6, tail: 0.5, rain: 1.2 };
 
 function hash(a, b, k = 0) {
   let h = (a * 374761393 + b * 668265263 + k * 2147483647) | 0;
@@ -168,6 +168,11 @@ export function createRenderer(canvas) {
       if (!reduceMotion) shakeUntil = time + 0.45;
     }
     if (e.type === 'bite') dragonAnim.mouthUntil = time + 0.25;
+    if (e.type === 'rain') {
+      fx.parts = Array.from({ length: reduceMotion ? 30 : 90 }, () => ({ x: Math.random() * COLS, y: Math.random() * ROWS, v: 0.6 + Math.random() * 0.8 }));
+      dragonAnim.mouthUntil = time + 0.8;
+    }
+    if (e.type === 'tail') dragonAnim.wingUntil = time + 0.4;
     effects.push(fx);
   }
 
@@ -277,6 +282,44 @@ export function createRenderer(canvas) {
       }
     } else if (e.type === 'grab') {
       drawSparkle(ctx, e.x * T, (e.y - 0.7) * T, T * 0.25 * (1 - a), 1 - a);
+    } else if (e.type === 'snare') {
+      const close = Math.min(1, a * 4);
+      ctx.strokeStyle = `rgba(200,206,220,${1 - a})`;
+      ctx.lineWidth = T * 0.07;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(e.x * T, (e.y + 0.2 + side * 0.25 * (1 - close)) * T, T * 0.35, side < 0 ? 0.1 * Math.PI : 1.1 * Math.PI, side < 0 ? 0.9 * Math.PI : 1.9 * Math.PI);
+        ctx.stroke();
+      }
+    } else if (e.type === 'teleport') {
+      ctx.strokeStyle = `rgba(190,140,255,${1 - a})`;
+      ctx.lineWidth = T * 0.08;
+      ctx.beginPath();
+      ctx.arc((e.c + 0.5) * T, (e.r + 0.5) * T, T * (0.2 + 0.5 * a), 0, TAU);
+      ctx.stroke();
+      for (let k = 0; k < 6; k++) {
+        const ang = (k / 6) * TAU + a * 3;
+        drawSparkle(ctx, e.x * T + Math.cos(ang) * T * 0.4 * a, (e.y - 0.3) * T + Math.sin(ang) * T * 0.4 * a, T * 0.08, 1 - a);
+      }
+    } else if (e.type === 'smoke') {
+      ctx.fillStyle = `rgba(200,195,210,${0.35 * (1 - a)})`;
+      ctx.beginPath();
+      ctx.arc((e.c + 0.5) * T, (e.r + 0.5) * T, T * (0.5 + 1.2 * a), 0, TAU);
+      ctx.fill();
+    } else if (e.type === 'tail') {
+      ctx.strokeStyle = `rgba(255,214,150,${0.7 * (1 - a)})`;
+      ctx.lineWidth = T * 0.16 * (1 - a);
+      ctx.beginPath();
+      ctx.arc(DRAGON_CENTER.x * T, DRAGON_CENTER.y * T, T * (1.5 + 2.2 * a), 0.1 * Math.PI, 0.9 * Math.PI);
+      ctx.stroke();
+    } else if (e.type === 'rain') {
+      for (const p of e.parts) {
+        const y = (p.y + a * p.v * 3) % ROWS;
+        ctx.fillStyle = `rgba(255,${120 + Math.round(p.v * 80)},50,${0.8 * (1 - a)})`;
+        ctx.beginPath();
+        ctx.arc(p.x * T, y * T, T * 0.06, 0, TAU);
+        ctx.fill();
+      }
     }
     ctx.restore();
   }
@@ -317,6 +360,7 @@ export function createRenderer(canvas) {
     const glanz = effGlanz(state, c, r);
     const weight = effWeight(state, c, r);
     ctx.font = `800 ${Math.round(T * 0.22)}px ${FONT}`;
+    ctx.textAlign = 'left';
     const text = String(glanz);
     const w = ctx.measureText(text).width + T * 0.3;
     ctx.fillStyle = 'rgba(14,11,16,0.8)';
@@ -424,7 +468,7 @@ export function createRenderer(canvas) {
     ctx.lineDashOffset = -time * T * 0.6;
     for (const h of state.heroes) {
       if (h.state !== 'seek' && h.state !== 'grab') continue;
-      if (!h.target) continue;
+      if (!h.target || h.state === 'cast') continue;
       const tx = (h.target.c + 0.5) * T;
       const ty = (h.target.r + 0.5) * T;
       ctx.strokeStyle = 'rgba(169,193,217,0.35)';
@@ -436,7 +480,7 @@ export function createRenderer(canvas) {
     }
     ctx.setLineDash([]);
     for (const h of state.heroes) {
-      if ((h.state !== 'seek' && h.state !== 'grab') || !h.target) continue;
+      if ((h.state !== 'seek' && h.state !== 'grab' && h.state !== 'cast') || !h.target) continue;
       ctx.strokeStyle = 'rgba(169,193,217,0.8)';
       ctx.lineWidth = T * 0.04;
       ctx.beginPath();
@@ -460,7 +504,28 @@ export function createRenderer(canvas) {
         ctx.ellipse(px, h.y * T + T * 0.27, T * 0.3, T * 0.11, 0, 0, TAU);
         ctx.stroke();
       }
+      if (h.state === 'cast' && h.target) {
+        const k = Math.min(1, h.castT / h.caster.time);
+        const tx = (h.target.c + 0.5) * T;
+        const ty = (h.target.r + 0.5) * T;
+        ctx.save();
+        ctx.strokeStyle = `rgba(190,140,255,${0.35 + 0.5 * k})`;
+        ctx.lineWidth = T * (0.04 + 0.08 * k);
+        ctx.setLineDash([T * 0.1, T * 0.08]);
+        ctx.lineDashOffset = -time * T;
+        ctx.beginPath();
+        ctx.moveTo(px - T * 0.2, py - T * 0.3);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = '#c8a0ff';
+        ctx.lineWidth = T * 0.06;
+        ctx.beginPath();
+        ctx.arc(tx, ty, T * 0.42, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+        ctx.stroke();
+      }
       drawHero(ctx, h.type, px, py, T * 0.92, { hit: h.hit });
+      if (h.wears) drawTreasure(ctx, h.wears, px + T * 0.26, py - T * 0.36, T * 0.34, time);
       if (h.carry) drawTreasure(ctx, h.carry.id, px, py - T * 0.62, T * 0.48, time);
       const bw = T * 0.62;
       const by = py - T * (h.carry ? 0.95 : 0.52);
@@ -468,6 +533,7 @@ export function createRenderer(canvas) {
       ctx.fillRect(px - bw / 2, by, bw, T * 0.08);
       ctx.fillStyle = h.fireproof ? '#cfd6e6' : '#e05656';
       ctx.fillRect(px - bw / 2, by, bw * Math.max(0, h.hp / h.maxHp), T * 0.08);
+      if (h.name) floatText(`${h.name} ${'★'.repeat(h.rank)}`, px, by - T * 0.08, '#ff8a8a', 1, 0.2);
       if (h.state === 'grab') {
         ctx.strokeStyle = '#ffd36b';
         ctx.lineWidth = T * 0.06;
@@ -492,9 +558,28 @@ export function createRenderer(canvas) {
     }
   }
 
+  function drawGuardians(state, time, night) {
+    for (const g of state.guardians) drawGuardian(ctx, (g.c + 0.5) * T, (g.r + 0.45) * T, T * 0.9, time, night ? 1 : 0.35);
+  }
+
+  function drawSmoke(state, time) {
+    for (const sm of state.smoke) {
+      const left = Math.max(0, Math.min(1, (sm.until - state.t) / 2));
+      for (let k = 0; k < 7; k++) {
+        const ox = (hash(sm.c, sm.r, k) - 0.5) * 2.4;
+        const oy = (hash(sm.c, sm.r, k + 9) - 0.5) * 2.4;
+        const wob = Math.sin(time * 1.3 + k) * 0.08;
+        ctx.fillStyle = `rgba(185,180,195,${0.32 * left})`;
+        ctx.beginPath();
+        ctx.arc((sm.c + 0.5 + ox + wob) * T, (sm.r + 0.5 + oy) * T, T * (0.55 + 0.2 * hash(sm.c, sm.r, k + 3)), 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+
   function drawTargeting(state, view) {
     if (state.phase !== 'night' || !view.card) return;
-    if (view.card === 'feuer' && view.hover) {
+    if ((view.card === 'feuer' || view.card === 'rauch') && view.hover) {
       const { c, r } = view.hover;
       ctx.fillStyle = 'rgba(255,138,61,0.18)';
       ctx.fillRect((c - 1) * T, (r - 1) * T, 3 * T, 3 * T);
@@ -547,7 +632,8 @@ export function createRenderer(canvas) {
       ctx.restore();
       return;
     }
-    const day = DAY_PHASES.has(state.phase);
+    const hub = !!view.hub;
+    const day = DAY_PHASES.has(state.phase) && !hub;
     const night = state.phase === 'night';
     ctx.fillStyle = night ? 'rgba(18,28,64,0.2)' : 'rgba(255,190,110,0.035)';
     ctx.fillRect(0, 0, W, H);
@@ -555,17 +641,22 @@ export function createRenderer(canvas) {
     drawHoard(state, view, time, day);
     drawDigs(state, time);
     drawFloor(state, time);
+    drawGuardians(state, time, night);
     if (night) drawIntentions(state, time);
 
     dragonAnim.mouth = time < dragonAnim.mouthUntil ? 1 : Math.max(0, dragonAnim.mouth - 0.05);
     const wingT = Math.max(0, dragonAnim.wingUntil - time) / 0.7;
+    const species = SPECIES[state.opts.species];
     drawDragon(ctx, DRAGON_CENTER.x * T, (DRAGON_CENTER.y - 0.55) * T, T, time, {
-      awake: !day,
+      awake: !day && !hub,
       spread: night ? 0.45 + 0.55 * Math.sin(wingT * Math.PI) : 0.15,
       mouth: dragonAnim.mouth,
       shake: time < dragonAnim.roarUntil ? 1 : 0,
+      palette: species.palettes[state.opts.variant] ?? species.palettes[0],
+      scars: hub ? view.scars ?? 0 : state.opts.legend,
     });
 
+    drawSmoke(state, time);
     drawTargeting(state, view);
     drawHeroes(state, view, time);
     drawEffects(time);

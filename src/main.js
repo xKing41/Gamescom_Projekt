@@ -1,9 +1,11 @@
-// Verbindet Spiellogik, Höhlenbild und Tafel: Eingaben, Spielschleife, Start.
+// Verbindet Spiellogik, Meta-Progression, Höhlenbild und Tafel: Eingaben, Spielschleife, Speichern, Start.
 
 import * as Sim from './sim.js';
-import { TREASURES, CARDS, CARD_BY_ID } from './data.js';
+import * as Meta from './meta.js';
+import { TREASURES, CARD_BY_ID, HAND_SIZE } from './data.js';
 import { createRenderer } from './render.js';
 import { createUI } from './ui.js';
+import { createStore, loadLocal } from './storage.js';
 import { randomSeed, codeToSeed } from './rng.js';
 
 const canvas = document.getElementById('board');
@@ -11,6 +13,8 @@ const wrap = document.getElementById('board-wrap');
 const renderer = createRenderer(canvas);
 
 const view = {
+  hub: true, // Höhle zwischen den Runs: das Brett ist nur Vorschau
+  scars: 0,
   held: null, // ausgewählter Schatz: { where: 'hoard', c, r } | { where: 'tray', i }
   drag: null,
   hover: null,
@@ -20,18 +24,77 @@ const view = {
   paused: false,
   speed: 1,
 };
-const app = { state: null, view, act };
+
+const store = createStore(loadLocal() ?? Meta.newProfile(), () => {
+  // Auf einem anderen Gerät wurde weitergespielt: Höhle mit dem zusammengeführten Stand neu zeigen
+  if (app.mode === 'hub') showHub();
+});
+
+const app = {
+  mode: 'hub', // 'hub' | 'run'
+  state: null,
+  report: null,
+  finished: false,
+  view,
+  act,
+  get profile() {
+    return store.get();
+  },
+};
 const ui = createUI(app);
 
-function seedFromHash() {
-  const m = /^#([0-9a-z]{1,7})$/i.exec(location.hash);
-  return m ? codeToSeed(m[1]) : null;
+// ── Profil ändern ──
+
+function updateProfile(change) {
+  const next = structuredClone(store.get());
+  change(next);
+  next.updatedAt = Date.now();
+  store.save(next);
 }
 
-function newRun(seed) {
-  app.state = Sim.createRun(seed ?? randomSeed());
+// ── Höhle und Runs ──
+
+function showHub() {
+  const p = store.get();
+  const options = Meta.runOptions(p, 'normal');
+  app.mode = 'hub';
+  app.report = null;
+  app.state = Sim.createRun(1, options);
+  view.hub = true;
+  view.scars = Meta.maxLegend(p, options.species);
+  view.held = null;
+  view.card = null;
+  view.paused = false;
+  ui.render();
+}
+
+function startRun(seed, options) {
+  app.mode = 'run';
+  app.report = null;
+  app.finished = false;
+  app.state = Sim.createRun(seed, options);
+  view.hub = false;
   view.held = null;
   view.drag = null;
+  view.card = null;
+  view.paused = false;
+  ui.render();
+}
+
+function startFromHub() {
+  const p = store.get();
+  const mode = Meta.modeAvailable(p, p.choice.mode) ? p.choice.mode : 'normal';
+  const seed = mode === 'weekly' ? Meta.weekSeed(Meta.weekKey()) : randomSeed();
+  startRun(seed, Meta.runOptions(p, mode));
+}
+
+// Nach Sieg oder Niederlage: Fortschritt auswerten und speichern – genau einmal pro Run
+function finishRun() {
+  if (app.finished) return;
+  app.finished = true;
+  const { profile, report } = Meta.applyRun(store.get(), app.state);
+  store.save(profile);
+  app.report = report;
   view.card = null;
   view.paused = false;
   ui.render();
@@ -40,6 +103,62 @@ function newRun(seed) {
 function act(type, p = {}) {
   const s = app.state;
   switch (type) {
+    // Höhle
+    case 'pick-species':
+      updateProfile((pr) => {
+        pr.choice.species = p.id;
+        pr.choice.legend = Math.min(pr.choice.legend, Meta.maxLegend(pr, p.id));
+      });
+      showHub();
+      return;
+    case 'pick-variant':
+      updateProfile((pr) => {
+        pr.species[pr.choice.species].variant = p.i;
+      });
+      showHub();
+      return;
+    case 'pick-legend':
+      updateProfile((pr) => {
+        pr.choice.legend = p.i;
+      });
+      showHub();
+      return;
+    case 'toggle-card': {
+      const hand = Meta.validLoadout(store.get());
+      if (!hand.includes(p.id) && hand.length >= HAND_SIZE) {
+        ui.toast(`Du hast schon ${HAND_SIZE} Karten. Nimm erst eine heraus.`);
+        return;
+      }
+      if (hand.includes(p.id) && hand.length <= 1) return;
+      updateProfile((pr) => {
+        pr.loadout = hand.includes(p.id) ? hand.filter((id) => id !== p.id) : [...hand, p.id];
+      });
+      ui.render();
+      return;
+    }
+    case 'pick-mode':
+      updateProfile((pr) => {
+        pr.choice.mode = p.id;
+      });
+      ui.render();
+      return;
+    case 'intro-ok':
+      updateProfile((pr) => {
+        pr.introSeen = true;
+      });
+      ui.render();
+      return;
+    case 'start-run':
+      startFromHub();
+      return;
+    case 'to-hub':
+      showHub();
+      return;
+    case 'again':
+      startRun(s.opts.mode === 'weekly' ? s.seed : randomSeed(), s.opts.mode === 'weekly' || s.opts.mode === 'code' ? s.opts : Meta.runOptions(store.get(), s.opts.mode));
+      return;
+
+    // Run
     case 'raid':
       Sim.chooseRaid(s, p.id);
       break;
@@ -68,14 +187,8 @@ function act(type, p = {}) {
     case 'take-morning':
       Sim.takeMorningLoot(s, p.indices);
       break;
-    case 'new-run':
-      newRun();
-      return;
-    case 'replay':
-      newRun(s.seed);
-      return;
     case 'pause':
-      if (s.phase === 'night') view.paused = !view.paused;
+      if (app.mode === 'run' && s.phase === 'night') view.paused = !view.paused;
       ui.tick();
       return;
     case 'speed':
@@ -90,7 +203,7 @@ function act(type, p = {}) {
 
 function selectCard(id) {
   const s = app.state;
-  if (s.phase !== 'night') return;
+  if (app.mode !== 'run' || s.phase !== 'night' || !s.opts.cards.includes(id)) return;
   const card = CARD_BY_ID[id];
   if (s.glut < card.cost) {
     ui.toast('Zu wenig Glut.');
@@ -131,11 +244,13 @@ function place(from, cell) {
   ui.render();
 }
 
+const inDay = () => app.mode === 'run' && Sim.DAY_PHASES.has(app.state.phase);
+
 // ── Zeigen, Ziehen, Tippen ──
 
 canvas.addEventListener('pointerdown', (e) => {
   const s = app.state;
-  if (!s) return;
+  if (!s || app.mode !== 'run') return;
   view.pointerType = e.pointerType;
   view.pointer = { x: e.clientX, y: e.clientY };
   view.hover = renderer.cellAt(e.clientX, e.clientY);
@@ -143,7 +258,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (view.card) castAt(e.clientX, e.clientY);
     return;
   }
-  if (!Sim.DAY_PHASES.has(s.phase) || view.held || !view.hover) return;
+  if (!inDay() || view.held || !view.hover) return;
   if (Sim.itemAt(s, view.hover.c, view.hover.r)) {
     view.drag = { from: { where: 'hoard', c: view.hover.c, r: view.hover.r }, x0: e.clientX, y0: e.clientY, moved: false };
     canvas.setPointerCapture(e.pointerId);
@@ -153,14 +268,13 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   view.pointerType = e.pointerType;
   view.pointer = { x: e.clientX, y: e.clientY };
-  view.hover = renderer.cellAt(e.clientX, e.clientY);
+  view.hover = app.mode === 'run' ? renderer.cellAt(e.clientX, e.clientY) : null;
   if (view.drag && !view.drag.moved && Math.hypot(e.clientX - view.drag.x0, e.clientY - view.drag.y0) > 8) view.drag.moved = true;
   ui.showInfo();
 });
 
 canvas.addEventListener('pointerup', (e) => {
-  const s = app.state;
-  if (!s || !Sim.DAY_PHASES.has(s.phase)) {
+  if (!inDay()) {
     view.drag = null;
     return;
   }
@@ -192,19 +306,22 @@ canvas.addEventListener('pointerleave', () => {
 window.addEventListener('keydown', (e) => {
   const s = app.state;
   if (!s || e.target.closest?.('input, textarea')) return;
-  if (s.phase === 'night' && e.key >= '1' && e.key <= String(CARDS.length)) {
-    selectCard(CARDS[Number(e.key) - 1].id);
+  const night = app.mode === 'run' && s.phase === 'night';
+  if (night && e.key >= '1' && e.key <= String(s.opts.cards.length)) {
+    selectCard(s.opts.cards[Number(e.key) - 1]);
     e.preventDefault();
   } else if (e.key === 'Escape') {
-    const help = document.getElementById('help');
-    if (!help.hidden) help.hidden = true;
+    for (const id of ['help', 'book']) {
+      const el = document.getElementById(id);
+      if (!el.hidden) el.hidden = true;
+    }
     view.card = null;
     if (view.held) {
       view.held = null;
       ui.render();
     }
     ui.tick();
-  } else if (e.key === ' ' && s.phase === 'night') {
+  } else if (e.key === ' ' && night) {
     act('pause');
     e.preventDefault();
   } else if (e.key === 'f' || e.key === 'F') {
@@ -220,13 +337,14 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const s = app.state;
-  if (s && s.phase === 'night' && !view.paused) {
+  if (s && app.mode === 'run' && s.phase === 'night' && !view.paused) {
     const aiming = view.card && CARD_BY_ID[view.card].target !== 'none';
     Sim.update(s, dt * view.speed * (aiming ? 0.3 : 1));
     if (s.phase !== 'night') {
       view.card = null;
       view.paused = false;
-      ui.render();
+      if (s.phase === 'won' || s.phase === 'lost') finishRun();
+      else ui.render();
     }
   }
   renderer.draw(s, view, now / 1000);
@@ -238,22 +356,35 @@ new ResizeObserver(() => renderer.resize(wrap.clientWidth, wrap.clientHeight)).o
 renderer.resize(wrap.clientWidth, wrap.clientHeight);
 
 // Für Tests und zum Ausprobieren in der Konsole
-window.__hort = { app, renderer, Sim };
+window.__hort = { app, renderer, Sim, Meta, store, showHub, finishRun };
+
+function seedFromHash() {
+  const m = /^#([0-9a-z]{1,7})$/i.exec(location.hash);
+  return m ? codeToSeed(m[1]) : null;
+}
 
 function start(data) {
   const restored = data?.run ? Sim.restore(data.run) : null;
-  if (restored) {
+  const code = seedFromHash();
+  if (restored && data.mode === 'run') {
+    app.mode = 'run';
     app.state = restored;
+    app.finished = restored.phase === 'won' || restored.phase === 'lost';
+    app.report = data.report ?? null;
+    view.hub = false;
     ui.render();
+  } else if (code != null) {
+    // Ein Hort-Code im Link startet diesen Run mit festen Regeln
+    startRun(code, { ...Meta.runOptions(store.get(), 'code'), mode: 'code' });
   } else {
-    newRun(seedFromHash() ?? undefined);
+    showHub();
   }
   requestAnimationFrame(frame);
 }
 
 // Bei einer neuen Version im Viewer läuft der Run weiter, statt neu zu starten
 try {
-  window.claude?.hot?.snapshot?.(() => ({ run: app.state ? Sim.snapshot(app.state) : null }));
+  window.claude?.hot?.snapshot?.(() => ({ mode: app.mode, run: app.state && app.mode === 'run' ? Sim.snapshot(app.state) : null, report: app.report }));
 } catch {
   // Ohne Viewer gibt es nichts zu sichern
 }
