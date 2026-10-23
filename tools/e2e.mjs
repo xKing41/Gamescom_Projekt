@@ -310,6 +310,15 @@ for (const vp of viewports) {
   await shot('1-einstellungen');
   await press('b');
   await shot('2-hoehle');
+  // Hortbuch: links neben dem Startknopf, Reiter mit LB/RB wechseln
+  await press('left');
+  await press('a');
+  check(await page.evaluate(() => !document.getElementById('book').hidden), 'A öffnet das Hortbuch nicht');
+  await press('rb');
+  check(await page.evaluate(() => document.querySelector('#book-tabs .is-on')?.dataset.tab === 'helden'), 'RB wechselt den Reiter im Hortbuch nicht');
+  await press('b');
+  check(await page.evaluate(() => document.getElementById('book').hidden), 'B schließt das Hortbuch nicht');
+  await press('right');
   await press('y');
   check((await st()).phase === 'raid', 'Y startet keinen Run');
   await press('a');

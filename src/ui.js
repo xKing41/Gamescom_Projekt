@@ -644,11 +644,14 @@ export function createUI(app) {
   }
 
   function renderBook(tab = bookTab) {
+    // Lag der Fokus auf einem Reiter, bleibt er nach dem Neuzeichnen auf dem gewählten
+    const tabFocused = !!document.activeElement?.dataset?.tab;
     bookTab = tab;
     const p = app.profile;
     $('book-tabs').innerHTML = TABS.map(([id, name]) => `<button class="tab${id === tab ? ' is-on' : ''}" type="button" role="tab" aria-selected="${id === tab}" data-tab="${id}">${name}</button>`).join('');
     const [summary, rows] = bookContent(tab, p);
     $('book-body').innerHTML = `<p class="muted">${summary}</p><ul class="entries">${rows.join('')}</ul>`;
+    if (tabFocused) $('book-tabs').querySelector(`[data-tab="${tab}"]`)?.focus();
   }
 
   function openBook(tab) {
