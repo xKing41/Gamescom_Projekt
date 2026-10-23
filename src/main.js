@@ -381,10 +381,20 @@ window.addEventListener('keydown', (e) => {
 
 let last = performance.now();
 
+// Ton und Controller sind Zugaben: Geht dort etwas schief, läuft das Spiel trotzdem weiter.
+// Der Fehler landet in der Konsole, damit die Tests ihn sehen.
+function safely(fn) {
+  try {
+    fn();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  app.pad.poll(dt);
+  safely(() => app.pad.poll(dt));
   const s = app.state;
   // Solange Regeln, Hortbuch oder Einstellungen offen sind, steht die Nacht still
   if (s && app.mode === 'run' && s.phase === 'night' && !view.paused && !ui.overlayOpen()) {
@@ -397,10 +407,10 @@ function frame(now) {
       else ui.render();
     }
   }
-  audio.update(s, app.mode, view);
+  safely(() => audio.update(s, app.mode, view));
   if (s?.fx.length) {
-    audio.effects(s.fx);
-    app.pad.effects(s.fx);
+    safely(() => audio.effects(s.fx));
+    safely(() => app.pad.effects(s.fx));
   }
   renderer.draw(s, view, now / 1000);
   ui.tick();

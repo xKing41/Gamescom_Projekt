@@ -25,6 +25,17 @@ const BOX = {
   r1: Math.max(...HOARD_CELLS.map((h) => h.r)),
 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// In einem fremden Rahmen ohne Controller-Erlaubnis wirft getGamepads einen Fehler (z. B. Firefox) –
+// dann gibt es eben keinen Controller, das Spiel läuft weiter
+function gamepads() {
+  try {
+    return navigator.getGamepads?.() ?? [];
+  } catch {
+    return [];
+  }
+}
+
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 export function createPad(app, { ui, renderer, actions }) {
@@ -339,7 +350,7 @@ export function createPad(app, { ui, renderer, actions }) {
   // ── Abfrage, einmal pro Bild ──
 
   function read() {
-    const pads = navigator.getGamepads?.() ?? [];
+    const pads = gamepads();
     let chosen = index != null ? pads[index] : null;
     for (const gp of pads) {
       if (!gp?.connected) continue;
@@ -430,7 +441,7 @@ export function createPad(app, { ui, renderer, actions }) {
   const RUMBLE = { roar: [380, 0.7, 0.4], tail: [160, 0.45, 0.3], wing: [140, 0.2, 0.35], fire: [220, 0.25, 0.4], rain: [500, 0.15, 0.3], snare: [90, 0.3, 0.2] };
   function effects(list) {
     if (view.input !== 'pad' || index == null || !list.length) return;
-    const gp = navigator.getGamepads?.()[index];
+    const gp = gamepads()[index];
     const motor = gp?.vibrationActuator;
     if (!motor?.playEffect) return;
     for (const e of list) {
@@ -452,7 +463,7 @@ export function createPad(app, { ui, renderer, actions }) {
       return family;
     },
     get connected() {
-      return index != null && !!navigator.getGamepads?.()[index]?.connected;
+      return index != null && !!gamepads()[index]?.connected;
     },
   };
 }

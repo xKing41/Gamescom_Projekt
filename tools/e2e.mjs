@@ -39,6 +39,12 @@ let failed = false;
 
 for (const vp of viewports) {
   const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height }, isMobile: !!vp.isMobile, hasTouch: !!vp.hasTouch });
+  // Am Handy wie in Firefox im Artifact-Rahmen: Controller-Zugriff verboten, das Spiel muss trotzdem laufen
+  if (vp.hasTouch) {
+    await page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value: () => { throw new DOMException('gamepad nicht erlaubt', 'SecurityError'); } });
+    });
+  }
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => {
