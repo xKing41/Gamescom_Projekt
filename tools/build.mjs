@@ -45,13 +45,11 @@ console.log(`dist/hort.html gebaut (${Math.round((head.length + body.length) / 1
 // ── Desktop ──
 
 const FONTS = [
-  ['Alegreya Sans', 'alegreya-sans', 400, 'normal'],
-  ['Alegreya Sans', 'alegreya-sans', 500, 'normal'],
-  ['Alegreya Sans', 'alegreya-sans', 700, 'normal'],
-  ['Alegreya Sans', 'alegreya-sans', 800, 'normal'],
-  ['Alegreya Sans', 'alegreya-sans', 400, 'italic'],
-  ['Grenze Gotisch', 'grenze-gotisch', 600, 'normal'],
-  ['Grenze Gotisch', 'grenze-gotisch', 800, 'normal'],
+  ['Pixelify Sans', 'pixelify-sans', 400, 'normal'],
+  ['Pixelify Sans', 'pixelify-sans', 500, 'normal'],
+  ['Pixelify Sans', 'pixelify-sans', 600, 'normal'],
+  ['Pixelify Sans', 'pixelify-sans', 700, 'normal'],
+  ['Jacquard 24', 'jacquard-24', 400, 'normal'],
 ];
 const desk = rel('dist/desktop');
 await rm(desk, { recursive: true, force: true });

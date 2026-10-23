@@ -4,7 +4,7 @@
 import { TREASURES, HEROES, RAIDS, CARDS, CARD_BY_ID, SPECIES, SPECIES_ORDER, LEGEND, DEEDS, UNLOCKS, UNLOCK_KINDS, CONFIG, HAND_SIZE, META } from './data.js';
 import * as Sim from './sim.js';
 import * as Meta from './meta.js';
-import { iconURL } from './icons.js';
+import { iconURL } from './pixel/images.js';
 import { seedToCode } from './rng.js';
 import { CARD_BUTTONS } from './pad.js';
 
@@ -31,7 +31,7 @@ const heroImg = (type, size = 36, silhouette = false) => img(iconURL('hero', typ
 function dragonImg(species, variant = 0, { width = 120, silhouette = false, scars = 0 } = {}) {
   const palettes = SPECIES[species].palettes;
   const palette = palettes[variant] ?? palettes[0];
-  return img(iconURL('dragon', `${species}:${variant}`, 96, { silhouette, palette, scars }), width, Math.round(width * 0.4));
+  return img(iconURL('dragon', `${species}:${variant}`, 96, { silhouette, palette, scars }), width, Math.round((width * 56) / 128));
 }
 
 function unlockIcon(id, size = 30) {
@@ -57,6 +57,7 @@ function cardMini(card, { on = false, action = null, key = null } = {}) {
   const tag = action ? 'button' : 'div';
   return `<${tag} class="card${on ? ' is-on' : ''}"${attrs}${action ? '' : ' role="group"'}>
     <span class="card-top">${key ? `<kbd>${key}</kbd>` : '<span></span>'}<span class="cost" aria-label="${card.cost} Glut">${'<i></i>'.repeat(card.cost)}</span></span>
+    <img class="card-art" src="${iconURL('card', card.id)}" alt="" width="48" height="48">
     <strong>${esc(card.name)}</strong>
     <span class="card-text">${esc(card.text)}</span>
   </${tag}>`;
@@ -482,6 +483,7 @@ export function createUI(app) {
       const key = usingPad() ? app.pad.label(CARD_BUTTONS[i]) : i + 1;
       return `<button class="card" type="button" data-action="card" data-id="${card.id}" id="card-${card.id}">
         <span class="card-top"><kbd>${esc(key)}</kbd><span class="cost" aria-label="${card.cost} Glut">${'<i></i>'.repeat(card.cost)}</span></span>
+        <img class="card-art" src="${iconURL('card', card.id)}" alt="" width="48" height="48">
         <strong>${esc(card.name)}</strong>
         <span class="card-text">${esc(card.text)}</span>
       </button>`;

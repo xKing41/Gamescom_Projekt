@@ -13,7 +13,8 @@
     "e2e": "node tools/e2e.mjs",
     "audio": "node tools/audio-check.mjs",
     "desktop": "node tools/build.mjs && electron .",
-    "pack": "node tools/build.mjs && electron-builder --dir --publish never"
+    "pack": "node tools/build.mjs && electron-builder --dir --publish never",
+    "sprites": "node tools/sprites.mjs"
   },
   "build": {
     "appId": "io.github.xking41.hort",
@@ -48,8 +49,8 @@
     }
   },
   "devDependencies": {
-    "@fontsource/alegreya-sans": "5.3.0",
-    "@fontsource/grenze-gotisch": "5.3.0",
+    "@fontsource/jacquard-24": "5.3.0",
+    "@fontsource/pixelify-sans": "5.3.0",
     "electron": "44.7.0",
     "electron-builder": "26.15.3",
     "esbuild": "0.28.2"

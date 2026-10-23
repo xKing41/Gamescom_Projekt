@@ -1,4 +1,4 @@
-// Zeichnet das App-Symbol mit dem Code des Spiels (Golddrache auf seinem Hort) und speichert es
+// Zeichnet das App-Symbol aus den Pixel-Sprites des Spiels (Golddrache über seinem Hort) und speichert es
 // als build/icon.png (512 × 512) für die Desktop-Fassung. Braucht Playwright.
 //
 //   node tools/icon.mjs
@@ -29,46 +29,57 @@ await page.route('http://hort.test/**', (route) => {
 await page.goto('http://hort.test/blank.html');
 
 const dataUrl = await page.evaluate(async () => {
-  const { drawDragon, drawTreasure } = await import('/src/icons.js');
+  const { dragonImage } = await import('/src/pixel/dragon.js');
+  const { treasureImg } = await import('/src/pixel/images.js');
   const { SPECIES } = await import('/src/data.js');
+  // Erst in Pixelgröße zusammensetzen (128 × 128), dann scharf auf 512 vergrößern
+  const N = 128;
+  const small = document.createElement('canvas');
+  small.width = N;
+  small.height = N;
+  const g = small.getContext('2d');
+  g.fillStyle = '#120e19';
+  g.fillRect(0, 0, N, N);
+  // Warmer Schein des Horts
+  const glow = g.createRadialGradient(64, 92, 4, 64, 88, 70);
+  glow.addColorStop(0, '#6b4316');
+  glow.addColorStop(0.5, '#2b1d22');
+  glow.addColorStop(1, '#120e19');
+  g.fillStyle = glow;
+  g.fillRect(0, 0, N, N);
+  // Goldhügel
+  g.fillStyle = '#5e3a14';
+  g.beginPath();
+  g.ellipse(64, 122, 60, 24, 0, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#8a5a1c';
+  g.beginPath();
+  g.ellipse(64, 124, 50, 16, 0, 0, Math.PI * 2);
+  g.fill();
+  for (const [id, x, y] of [['muenzen', 24, 92], ['kelch', 88, 90], ['krone', 40, 102], ['ei', 56, 94], ['barren', 72, 104]]) g.drawImage(treasureImg(id), x, y);
+  g.drawImage(dragonImage(SPECIES.gold.palettes[0], { awake: true, spread: 1 }), 0, 30);
+  // Kanten der Pixel hart halten: Alpha wegrunden
+  const img = g.getImageData(0, 0, N, N);
+  for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255;
+  g.putImageData(img, 0, 0);
   const S = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = S;
-  canvas.height = S;
-  const ctx = canvas.getContext('2d');
-  // Abgerundete Höhle mit goldenem Schein
-  const r = S * 0.2;
-  ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.arcTo(S, 0, S, S, r);
-  ctx.arcTo(S, S, 0, S, r);
-  ctx.arcTo(0, S, 0, 0, r);
-  ctx.arcTo(0, 0, S, 0, r);
-  ctx.closePath();
-  const bg = ctx.createRadialGradient(S / 2, S * 0.62, S * 0.05, S / 2, S * 0.55, S * 0.62);
-  bg.addColorStop(0, '#5a3d1c');
-  bg.addColorStop(0.45, '#2b2025');
-  bg.addColorStop(1, '#15121a');
-  ctx.fillStyle = bg;
-  ctx.fill();
-  ctx.save();
-  ctx.clip();
-  // Der Hort: ein Goldhügel mit Schätzen darauf
-  const mound = ctx.createRadialGradient(S / 2, S * 0.86, S * 0.02, S / 2, S * 0.9, S * 0.36);
-  mound.addColorStop(0, '#f3d98d');
-  mound.addColorStop(0.5, '#c8922e');
-  mound.addColorStop(1, 'rgba(120,70,20,0)');
-  ctx.fillStyle = mound;
-  ctx.beginPath();
-  ctx.ellipse(S / 2, S * 0.9, S * 0.42, S * 0.19, 0, 0, Math.PI * 2);
-  ctx.fill();
-  const T = S * 0.16;
-  for (const [id, x, y, k] of [['muenzen', 0.31, 0.8, 0.9], ['kelch', 0.69, 0.78, 0.95], ['barren', 0.5, 0.74, 1.1], ['ei', 0.5, 0.86, 0.85], ['muenzen', 0.64, 0.9, 0.85], ['krone', 0.36, 0.9, 0.85]]) {
-    drawTreasure(ctx, id, S * x, S * y, T * k, 0);
-  }
-  drawDragon(ctx, S / 2, S * 0.4, S * 0.128, 0.6, { awake: true, spread: 0.7, mouth: 0, shake: 0, palette: SPECIES.gold.palettes[0], scars: 0 });
-  ctx.restore();
-  return canvas.toDataURL('image/png');
+  const big = document.createElement('canvas');
+  big.width = S;
+  big.height = S;
+  const b = big.getContext('2d');
+  // Abgerundete Ecken wie bei App-Symbolen üblich
+  const r = 96;
+  b.beginPath();
+  b.moveTo(r, 0);
+  b.arcTo(S, 0, S, S, r);
+  b.arcTo(S, S, 0, S, r);
+  b.arcTo(0, S, 0, 0, r);
+  b.arcTo(0, 0, S, 0, r);
+  b.closePath();
+  b.clip();
+  b.imageSmoothingEnabled = false;
+  b.drawImage(small, 0, 0, S, S);
+  return big.toDataURL('image/png');
 });
 
 fs.mkdirSync(path.join(root, 'build'), { recursive: true });

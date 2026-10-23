@@ -223,7 +223,7 @@ Noch offen sind die Steam-Anbindung (Erfolge für die Taten, Bestenlisten für E
 
 1. **Nachtkampf:** Automatisch mit Atem-Karten (Vorschlag) oder den Drachen direkt steuern?
 2. **Setting:** Eigene Fantasy-Welt oder deutsche Sagenwelt (Nibelungen, Fafnir)?
-3. **Grafikstil:** Muss ohne KI-Bilder auskommen und auch auf schwachen PCs laufen.
+3. **Grafikstil:** Pixel-Art mit Licht (seit dem Stil-Test im Oktober 2026): 16 Pixel pro Feld, von Hand gesetzte Sprites, Licht und Glühen darüber. Ohne KI-Bilder, läuft auch auf schwachen PCs. Für die gamescom lohnt sich ein Pixel-Artist für Drache, Store-Bilder und Feinschliff.
 4. **Meta-Progression:** Nur Freischaltungen (Vorschlag) oder zusätzlich kleine dauerhafte Boni wie in Runenfall?
 
 ## Referenzen

@@ -39,6 +39,8 @@ Xbox- und PlayStation-Controller und das Steam Deck werden erkannt, die Tastenbi
 
 ## Was der Prototyp kann (v0.3)
 
+**Grafik:** Pixel-Art, 16 Pixel pro Feld. Die Höhle wird in Originalgröße gezeichnet und scharf vergrößert. Darüber liegt Licht: Der Hort glüht, Helden tragen nachts Fackeln, durch den Eingang fällt Mondlicht, Feuer erhellt die Höhle. Helden, Schätze, Kartenbilder und der Drachenkopf sind von Hand als Text-Raster gesetzt; jede Drachenart färbt dieselbe Zeichnung um. Ein Teil der Schätze wird noch aus der alten Vektorzeichnung verpixelt. Schriften: Jacquard 24 und Pixelify Sans (SIL Open Font License).
+
 **Ein Run:** 6 Nächte, 5 Nachbarreiche (3 je Run), 6 Heldentypen, 27 Schätze, 7 Atem-Karten. Dazu kommen die Glanz-Regel, Gewicht, Verschmelzen, Nachbar-Effekte, der Rabenbericht und die Beute der Besiegten.
 
 **Zwischen den Runs:**
@@ -68,6 +70,7 @@ npm run build     # baut dist/hort.html, dist/artifact.html und dist/desktop/
 npm test          # Meta-Tests und Balance-Bot (1.400 Runs ohne Grafik)
 npm run e2e       # Browser-Test mit Bildschirmfotos, auch mit simuliertem Controller (braucht Playwright)
 npm run audio     # Klang-Prüfung: Lautheit jedes Geräuschs, auch wie über einen Handy-Lautsprecher
+npm run sprites   # Übersicht aller Pixel-Sprites, prüft die Raster
 npm run desktop   # Desktop-Fassung starten
 npm run pack      # Desktop-Fassung für das eigene System packen (Ordner release/)
 ```
@@ -97,8 +100,12 @@ Ohne Atem-Karten gewinnt der Bot nie. Der Mondsilberdrache ist am schwersten, we
 | `src/audio.js` | Ton aus dem Code: Effekte, Atmosphäre, Harfe, Herzschlag |
 | `src/pad.js` | Controller: Rahmen, Zielhilfe, Fokus, Tastenbilder, Rütteln |
 | `src/rng.js` | Zufall mit Seed, Hort-Codes |
-| `src/icons.js` | Drachen, Helden und Schätze – alles im Code gezeichnet |
-| `src/render.js` | Zeichnet die Höhle und die Effekte |
+| `src/pixel/art.js` | Pixel-Art von Hand: Schätze, Helden, Knochenwächter, Kartenbilder |
+| `src/pixel/dragon.js` | Der Drache aus Teilen, Farben je Drachenart |
+| `src/pixel/cave.js` | Die Höhle in 3/4-Ansicht: Fels, Boden, Goldhaufen, Tropfsteine, Eingang |
+| `src/pixel/sprite.js`, `images.js`, `font.js` | Baukasten: Raster zu Bildern, Verpixeln, Umrandung, Pixel-Ziffern, Symbole für die Tafel |
+| `src/icons.js` | Alte Vektorzeichnungen; Vorlage für Schätze, die noch keine Handzeichnung haben |
+| `src/render.js` | Zeichnet die Höhle: Welt, Licht, Effekte, Rahmen und Zahlen |
 | `src/ui.js` | Höhle, Phasen, Run-Ende, Hortbuch und Kopfzeile |
 | `src/main.js` | Eingaben, Spielschleife, Ablauf zwischen Höhle und Run |
 | `tools/meta-test.mjs` | Tests der Meta-Progression |
@@ -107,6 +114,7 @@ Ohne Atem-Karten gewinnt der Bot nie. Der Mondsilberdrache ist am schwersten, we
 | `tools/build.mjs` | Baut die Einzeldatei und die Desktop-Seite |
 | `tools/audio-check.mjs` | Klang-Prüfung |
 | `tools/desktop-check.mjs` | Test der Desktop-Fassung |
-| `tools/icon.mjs` | Zeichnet das App-Symbol (`build/icon.png`) mit dem Spielcode |
+| `tools/icon.mjs` | Zeichnet das App-Symbol (`build/icon.png`) aus den Pixel-Sprites |
+| `tools/sprites.mjs` | Übersicht aller Sprites und Drachen, prüft die Raster |
 | `desktop/` | Electron-Hülle: Fenster, Spielstand-Datei, Startskript für Linux |
 | `.github/workflows/desktop.yml` | Baut Windows und Linux bei jedem Push und aktualisiert die Download-Links |
