@@ -6,6 +6,7 @@ import * as Sim from './sim.js';
 import * as Meta from './meta.js';
 import { iconURL } from './icons.js';
 import { seedToCode } from './rng.js';
+import { CARD_BUTTONS } from './pad.js';
 
 const esc = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const num = (value, digits = 1) => value.toFixed(digits).replace('.', ',');
@@ -40,6 +41,10 @@ function unlockIcon(id, size = 30) {
   return `<span class="glyph" aria-hidden="true">${u.kind === 'card' ? '✦' : '∞'}</span>`;
 }
 
+const SPEAKER = '<path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>';
+const ICON_SOUND = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">${SPEAKER}<path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const ICON_MUTED = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">${SPEAKER}<path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
 const unlockLabel = (id) => `${UNLOCK_KINDS[UNLOCKS[id].kind]}: ${UNLOCKS[id].name}`;
 
 function statsLine(d) {
@@ -69,10 +74,29 @@ export function createUI(app) {
     glut: $('s-glut'),
     glutWrap: $('s-glut-wrap'),
   };
-  const buttons = { pause: $('btn-pause'), speed: $('btn-speed'), help: $('btn-help'), helpClose: $('btn-help-close'), bookClose: $('btn-book-close') };
+  const buttons = {
+    pause: $('btn-pause'),
+    speed: $('btn-speed'),
+    help: $('btn-help'),
+    helpClose: $('btn-help-close'),
+    bookClose: $('btn-book-close'),
+    settings: $('btn-settings'),
+    settingsClose: $('btn-settings-close'),
+    mute: $('btn-mute'),
+    fullscreen: $('btn-fullscreen'),
+  };
   const help = $('help');
   const book = $('book');
+  const settingsEl = $('settings');
   const toastEl = $('toast');
+  const vol = { sfx: $('vol-sfx'), music: $('vol-music') };
+  const audio = app.audio;
+  const desktop = window.hortDesktop ?? null;
+
+  // Hinweise passend zum Eingabegerät: Tastatur und Maus oder Controller
+  const usingPad = () => app.view.input === 'pad' && !!app.pad;
+  const glyph = (name) => `<span class="pad-glyph">${esc(app.pad.label(name))}</span>`;
+  const padPrefix = (name) => (usingPad() ? `${glyph(name)} ` : '');
 
   let lootSel = [];
   let morningSel = new Set();
@@ -122,25 +146,109 @@ export function createUI(app) {
 
   buttons.pause.addEventListener('click', () => app.act('pause'));
   buttons.speed.addEventListener('click', () => app.act('speed'));
-  buttons.help.addEventListener('click', () => {
-    help.hidden = false;
-    buttons.helpClose.focus();
-  });
-  buttons.helpClose.addEventListener('click', () => {
-    help.hidden = true;
-    buttons.help.focus();
-  });
-  help.addEventListener('click', (e) => {
-    if (e.target === help) help.hidden = true;
-  });
-  buttons.bookClose.addEventListener('click', closeBook);
+
+  // ── Fenster: Regeln, Hortbuch, Einstellungen ──
+
+  const overlays = [help, book, settingsEl];
+  let returnFocus = null;
+  const overlayOpen = () => overlays.some((el) => !el.hidden);
+
+  function showOverlay(el, focusEl) {
+    closeOverlays(false);
+    returnFocus = document.activeElement;
+    el.hidden = false;
+    focusEl.focus();
+  }
+
+  function closeOverlays(restore = true) {
+    const open = overlays.filter((el) => !el.hidden);
+    for (const el of open) el.hidden = true;
+    if (open.length && restore && returnFocus?.isConnected) returnFocus.focus();
+  }
+
+  const openHelp = () => showOverlay(help, buttons.helpClose);
+  buttons.help.addEventListener('click', openHelp);
+  buttons.helpClose.addEventListener('click', () => closeOverlays());
+  buttons.bookClose.addEventListener('click', () => closeOverlays());
+  buttons.settings.addEventListener('click', openSettings);
+  buttons.settingsClose.addEventListener('click', () => closeOverlays());
+  for (const el of overlays) {
+    el.addEventListener('click', (e) => {
+      if (e.target === el) closeOverlays();
+    });
+  }
   book.addEventListener('click', (e) => {
-    if (e.target === book) {
-      closeBook();
-      return;
-    }
     const tab = e.target.closest('[data-tab]');
     if (tab) renderBook(tab.dataset.tab);
+  });
+
+  // ── Einstellungen ──
+
+  const percent = (v) => `${Math.round(v * 100)}\u00A0%`;
+
+  function syncSettings() {
+    const st = audio.settings;
+    for (const kind of ['sfx', 'music']) {
+      vol[kind].value = String(Math.round(st[kind] * 100));
+      $(`vol-${kind}-out`).textContent = percent(st[kind]);
+    }
+    buttons.mute.textContent = st.muted ? 'Ton einschalten' : 'Stumm schalten';
+    buttons.mute.setAttribute('aria-pressed', String(st.muted));
+    $('audio-note').hidden = audio.supported;
+    const full = desktop ? desktop.isFullscreen?.() : !!document.fullscreenElement;
+    $('row-fullscreen').hidden = !(desktop?.setFullscreen || document.fullscreenEnabled);
+    Promise.resolve(full).then((on) => {
+      buttons.fullscreen.textContent = on ? 'Fenster' : 'Vollbild';
+    });
+    const pad = app.pad;
+    $('pad-status').textContent = pad?.connected
+      ? `${pad.family === 'ps' ? 'PlayStation-Controller' : 'Controller'} verbunden. So ist er belegt:`
+      : 'Schließe einen Controller an und drücke eine Taste. So ist er belegt:';
+    // Am Handy ohne Controller bleibt die Belegung eingeklappt
+    $('pad-details').open = usingPad() || !!pad?.connected || !matchMedia('(pointer: coarse)').matches;
+    const L = (name) => `<kbd class="pad-key">${esc(pad ? pad.label(name) : name.toUpperCase())}</kbd>`;
+    $('pad-map').innerHTML = [
+      ['Hort ordnen', `Steuerkreuz bewegt den Rahmen · ${L('a')} nimmt und legt ab · ${L('lb')} ${L('rb')} neue Beute · ${L('x')} wirft weg · ${L('y')} beginnt die Nacht`],
+      ['Nacht', `${CARD_BUTTONS.map(L).join(' ')} Atem-Karten · Stick zielt · ${L('a')} setzt ein · ${L('b')} bricht ab · ${L('y')} Tempo · ${L('start')} Pause`],
+      ['Tafel', `Steuerkreuz wählt · ${L('a')} drückt · ${L('y')} drückt den goldenen Knopf`],
+      ['Immer', `${L('back')} Regeln · ${L('start')} Einstellungen · ${L('b')} schließt Fenster`],
+    ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  }
+
+  function openSettings() {
+    syncSettings();
+    showOverlay(settingsEl, vol.sfx);
+  }
+
+  let sampleTimer = 0;
+  for (const kind of ['sfx', 'music']) {
+    vol[kind].addEventListener('input', () => {
+      audio.unlock();
+      audio.setVolume(kind, Number(vol[kind].value) / 100);
+      syncSettings();
+      // Eine Kostprobe, damit man die neue Lautstärke hört
+      clearTimeout(sampleTimer);
+      if (kind === 'sfx') sampleTimer = setTimeout(() => audio.ui('merge', { c: 5.5 }), 120);
+    });
+  }
+  buttons.mute.addEventListener('click', () => {
+    audio.unlock();
+    audio.setMuted(!audio.settings.muted);
+    syncSettings();
+    tick();
+  });
+  buttons.fullscreen.addEventListener('click', async () => {
+    try {
+      if (desktop?.setFullscreen) await desktop.setFullscreen(!(await desktop.isFullscreen()));
+      else if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      toast('Vollbild ist hier nicht erlaubt.');
+    }
+    setTimeout(syncSettings, 150);
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if (!settingsEl.hidden) syncSettings();
   });
 
   function toast(text) {
@@ -275,7 +383,7 @@ export function createUI(app) {
       ${note}
       <div class="actions sticky-actions">
         <button class="ghost" type="button" data-action="open-book">Hortbuch</button>
-        <button class="primary" type="button" data-action="start-run">${startLabel}</button>
+        <button class="primary" type="button" data-action="start-run">${padPrefix('y')}${startLabel}</button>
       </div>`;
   }
 
@@ -318,7 +426,7 @@ export function createUI(app) {
     return `<p class="eyebrow">Raubzug · ${esc(raid.name)}</p>
       <h2>Wähle ${CONFIG.lootPick} Schätze</h2>
       <div class="loot-list">${items}</div>
-      <div class="actions"><button class="primary" type="button" data-action="take-loot"${ready ? '' : ' disabled'}>Mitnehmen</button></div>`;
+      <div class="actions"><button class="primary" type="button" data-action="take-loot"${ready ? '' : ' disabled'}>${padPrefix('y')}Mitnehmen</button></div>`;
   }
 
   function ravensHTML(s) {
@@ -345,7 +453,7 @@ export function createUI(app) {
 
   function arrangeHTML(s) {
     const tray = s.tray.length
-      ? `<div class="tray"><span class="label">Neue Beute – antippen und auf ein Feld legen</span><div class="tray-items">${s.tray.map((item, i) => {
+      ? `<div class="tray"><span class="label">${usingPad() ? `Neue Beute – mit ${glyph('lb')} ${glyph('rb')} auswählen` : 'Neue Beute – antippen und auf ein Feld legen'}</span><div class="tray-items">${s.tray.map((item, i) => {
         const on = app.view.held?.where === 'tray' && app.view.held.i === i;
         return `<button class="tray-item${on ? ' is-on' : ''}" type="button" data-action="pick-tray" data-i="${i}" aria-pressed="${on}" title="${esc(TREASURES[item.id].name)}">${treasureImg(item.id, 40)}</button>`;
       }).join('')}</div></div>`
@@ -353,23 +461,24 @@ export function createUI(app) {
     const rule = SPECIES[s.opts.species].rule ? `<p class="rule-note"><span class="label">${esc(SPECIES[s.opts.species].name)}</span> ${esc(SPECIES[s.opts.species].ruleText)}</p>` : '';
     return `<p class="eyebrow">Tag ${s.night} · ${esc(RAIDS[s.raid].name)} geplündert</p>
       <h2>Hort ordnen</h2>
-      <p class="lead">Ziehe Schätze auf ein Feld oder tippe sie an. Zwei gleiche aufeinander verschmelzen zu einem größeren.</p>
+      <p class="lead">${usingPad() ? `Steuerkreuz bewegt den Rahmen, ${glyph('a')} nimmt einen Schatz und legt ihn ab.` : 'Ziehe Schätze auf ein Feld oder tippe sie an.'} Zwei gleiche aufeinander verschmelzen zu einem größeren.</p>
       ${hatchPreviewHTML(s)}
       ${tray}
       <div class="info" id="info"></div>
       ${ravensHTML(s)}
       ${rule}
       <div class="actions">
-        <button class="ghost" type="button" data-action="discard" id="btn-discard" hidden>Wegwerfen</button>
-        <button class="primary" type="button" data-action="start-night">Nacht ${s.night} beginnen</button>
+        <button class="ghost" type="button" data-action="discard" id="btn-discard" hidden>${padPrefix('x')}Wegwerfen</button>
+        <button class="primary" type="button" data-action="start-night">${padPrefix('y')}Nacht ${s.night} beginnen</button>
       </div>`;
   }
 
   function nightHTML(s) {
     const cards = s.opts.cards.map((id, i) => {
       const card = CARD_BY_ID[id];
+      const key = usingPad() ? app.pad.label(CARD_BUTTONS[i]) : i + 1;
       return `<button class="card" type="button" data-action="card" data-id="${card.id}" id="card-${card.id}">
-        <span class="card-top"><kbd>${i + 1}</kbd><span class="cost" aria-label="${card.cost} Glut">${'<i></i>'.repeat(card.cost)}</span></span>
+        <span class="card-top"><kbd>${esc(key)}</kbd><span class="cost" aria-label="${card.cost} Glut">${'<i></i>'.repeat(card.cost)}</span></span>
         <strong>${esc(card.name)}</strong>
         <span class="card-text">${esc(card.text)}</span>
       </button>`;
@@ -407,7 +516,7 @@ export function createUI(app) {
       ${guards}
       <h3>Beute der Besiegten</h3>
       ${loot}
-      <div class="actions"><button class="primary" type="button" data-action="take-morning">Weiter zu Tag ${n.night + 1}</button></div>`;
+      <div class="actions"><button class="primary" type="button" data-action="take-morning">${padPrefix('y')}Weiter zu Tag ${n.night + 1}</button></div>`;
   }
 
   function rewardsHTML(s, r) {
@@ -462,7 +571,7 @@ export function createUI(app) {
       ${codeBlock}
       <div class="actions">
         <button class="ghost" type="button" data-action="again">Nochmal</button>
-        <button class="primary" type="button" data-action="to-hub">Zur Höhle</button>
+        <button class="primary" type="button" data-action="to-hub">${padPrefix('y')}Zur Höhle</button>
       </div>`;
   }
 
@@ -541,12 +650,12 @@ export function createUI(app) {
 
   function openBook(tab) {
     renderBook(tab);
-    book.hidden = false;
-    buttons.bookClose.focus();
+    showOverlay(book, buttons.bookClose);
   }
 
-  function closeBook() {
-    book.hidden = true;
+  function stepBookTab(step) {
+    const i = TABS.findIndex(([id]) => id === bookTab);
+    renderBook(TABS[(i + step + TABS.length) % TABS.length][0]);
   }
 
   // ── Rendern ──
@@ -581,6 +690,7 @@ export function createUI(app) {
     if (!book.hidden) renderBook();
     showInfo();
     tick();
+    app.onRender?.();
   }
 
   function showInfo() {
@@ -593,7 +703,7 @@ export function createUI(app) {
     let r = null;
     let label = '';
     if (v.held) {
-      label = 'Ausgewählt – tippe auf ein Feld';
+      label = usingPad() ? `Ausgewählt – ${esc(app.pad.label('a'))} legt ab` : 'Ausgewählt – tippe auf ein Feld';
       if (v.held.where === 'tray') {
         item = s.tray[v.held.i] ?? null;
       } else {
@@ -648,6 +758,7 @@ export function createUI(app) {
     set(buttons.pause, 'pauseLabel', app.view.paused ? 'Weiter' : 'Pause');
     set(buttons.pause, 'pauseDisabled', !night, 'disabled');
     set(buttons.speed, 'speed', `${app.view.speed}×`);
+    set(buttons.settings, 'sound', audio.settings.muted ? ICON_MUTED : ICON_SOUND, 'innerHTML');
     if (!night) return;
 
     const pips = $('glut-pips');
@@ -678,10 +789,13 @@ export function createUI(app) {
     const hint = $('night-hint');
     if (hint) {
       const card = app.view.card ? CARD_BY_ID[app.view.card] : null;
+      const pad = usingPad();
+      const L = (name) => app.pad.label(name);
       let text = 'Die Klaue trifft Helden direkt vor dir von selbst. Rot umrandete Helden tragen Beute – schnapp sie dir!';
-      if (app.view.paused) text = 'Pausiert. Weiter mit der Leertaste oder dem Knopf oben.';
-      else if (card?.target === 'tile') text = `${plain(card.name)}: Tippe auf ein Feld. Die Zeit läuft langsamer, solange du zielst. Esc bricht ab.`;
-      else if (card?.target === 'hero') text = `${plain(card.name)}: Tippe auf einen Helden im hellen Bereich. Esc bricht ab.`;
+      if (app.view.paused) text = pad ? `Pausiert. Weiter mit ${L('start')}.` : 'Pausiert. Weiter mit der Leertaste oder dem Knopf oben.';
+      else if (card?.target === 'tile') text = pad ? `${plain(card.name)}: Mit dem Stick zielen, ${L('a')} setzt ein, ${L('b')} bricht ab. Die Zeit läuft langsamer.` : `${plain(card.name)}: Tippe auf ein Feld. Die Zeit läuft langsamer, solange du zielst. Esc bricht ab.`;
+      else if (card?.target === 'hero') text = pad ? `${plain(card.name)}: Steuerkreuz wechselt den Helden, ${L('a')} schnappt zu, ${L('b')} bricht ab.` : `${plain(card.name)}: Tippe auf einen Helden im hellen Bereich. Esc bricht ab.`;
+      else if (pad) text = `Die Klaue trifft Helden vor dir von selbst. ${CARD_BUTTONS.slice(0, s.opts.cards.length).map(L).join(' ')} setzen deine Atem-Karten ein.`;
       set(hint, 'hint', text);
     }
     const foes = $('foes');
@@ -691,5 +805,5 @@ export function createUI(app) {
     }
   }
 
-  return { render, tick, showInfo, toast, openBook };
+  return { render, tick, showInfo, toast, openBook, openHelp, openSettings, closeOverlays, overlayOpen, bookTab: stepBookTab };
 }

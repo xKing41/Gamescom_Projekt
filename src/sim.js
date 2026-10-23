@@ -472,7 +472,7 @@ function startDig(state, entry) {
   }
   const { c, r } = pick(state, candidates);
   state.digs.push({ entry, c, r, at: state.t + CONFIG.digWarning, done: false });
-  state.fx.push({ type: 'text', x: c + 0.5, y: r + 0.1, text: 'Es grollt im Boden …', tone: 'warn' });
+  state.fx.push({ type: 'text', x: c + 0.5, y: r + 0.1, text: 'Es grollt im Boden …', tone: 'warn', cue: 'dig' });
 }
 
 function spawnHero(state, entry, tile, dug) {
@@ -515,7 +515,7 @@ function spawnHero(state, entry, tile, dug) {
     rank: nemesis?.rank ?? 0,
     wears: nemesis?.treasure ?? null,
   });
-  if (nemesis) state.fx.push({ type: 'text', x: tile.c + 0.5, y: tile.r - 0.2, text: `${nemesis.name} ist zurück!`, tone: 'bad' });
+  if (nemesis) state.fx.push({ type: 'text', x: tile.c + 0.5, y: tile.r - 0.2, text: `${nemesis.name} ist zurück!`, tone: 'bad', cue: 'nemesis' });
 }
 
 // ── Wege ────────────────────────────────────────────────────────
@@ -714,7 +714,7 @@ function updateHero(state, h, dt) {
         if (castValid(state, h)) {
           h.state = 'cast';
           h.castT = 0;
-          state.fx.push({ type: 'text', x: h.x, y: h.y - 0.7, text: 'zaubert …', tone: 'info' });
+          state.fx.push({ type: 'text', x: h.x, y: h.y - 0.7, text: 'zaubert …', tone: 'info', cue: 'cast' });
         } else {
           h.retarget = 0;
         }
@@ -771,7 +771,7 @@ function take(state, h) {
     state.hoard[idx(t.c, t.r)] = null;
     if (chimes && item) {
       state.glut = Math.min(state.glutMax, state.glut + chimes);
-      state.fx.push({ type: 'text', x: t.c + 0.5, y: t.r, text: `+${chimes} Glut`, tone: 'warn' });
+      state.fx.push({ type: 'text', x: t.c + 0.5, y: t.r, text: `+${chimes} Glut`, tone: 'warn', cue: 'chime' });
     }
   } else {
     const i = state.floor.findIndex((f) => f.item.uid === t.uid);
@@ -821,7 +821,7 @@ function arriveAtExit(state, h) {
   else record.stolen += 1;
   if (h.nemesis) state.runLog.nemesisEscaped.push(h.nemesis);
   else if (id !== 'ei' && value >= META.nemesisMinValue) state.runLog.newNemeses.push({ type: h.type, treasure: id });
-  state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: `${TREASURES[id].name} gestohlen`, tone: 'bad' });
+  state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: `${TREASURES[id].name} gestohlen`, tone: 'bad', cue: 'stolen', id });
   if (id === 'ei') {
     state.phase = 'lost';
     state.lostBy = h.type;
@@ -837,7 +837,7 @@ function damage(state, h, amount, quiet = false) {
   h.hp -= amount;
   if (h.state === 'cast' && h.castT > 0) {
     h.castT = 0;
-    if (!quiet) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.8, text: 'Zauber gestört', tone: 'good' });
+    if (!quiet) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.8, text: 'Zauber gestört', tone: 'good', cue: 'fizzle' });
   }
   if (!quiet) {
     h.hit = 0.15;
@@ -853,7 +853,7 @@ function kill(state, h) {
   if (h.wears) {
     state.floor.push({ item: newItem(state, h.wears), c, r });
     state.runLog.nemesisDefeated.push(h.nemesis);
-    state.fx.push({ type: 'text', x: h.x, y: h.y - 0.9, text: `${h.name} besiegt!`, tone: 'good' });
+    state.fx.push({ type: 'text', x: h.x, y: h.y - 0.9, text: `${h.name} besiegt!`, tone: 'good', cue: 'nemesisDown' });
   }
   if (ruleOf(state) === 'guardians') state.fallen.push({ c, r });
   h.state = 'dead';
@@ -866,7 +866,7 @@ function dropCarry(state, h) {
   if (!h.carry) return;
   const { c, r } = tileOf(h);
   state.floor.push({ item: h.carry, c, r });
-  state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'fallen gelassen', tone: 'good' });
+  state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'fallen gelassen', tone: 'good', cue: 'drop' });
   h.carry = null;
   replanAll(state);
 }
@@ -933,7 +933,7 @@ export function playCard(state, cardId, target = null) {
     state.fx.push({ type: 'fire', c: target.c, r: target.r });
     for (const h of activeHeroes(state)) {
       if (Math.abs(h.x - (target.c + 0.5)) > 1.5 || Math.abs(h.y - (target.r + 0.5)) > 1.5) continue;
-      if (h.fireproof) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'feuerfest', tone: 'info' });
+      if (h.fireproof) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'feuerfest', tone: 'info', cue: 'fireproof' });
       else damage(state, h, card.damage * pw);
     }
     return { ok: true };
@@ -1015,7 +1015,7 @@ export function playCard(state, cardId, target = null) {
     spend(state, card);
     state.fx.push({ type: 'rain' });
     for (const h of activeHeroes(state)) {
-      if (h.fireproof) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'feuerfest', tone: 'info' });
+      if (h.fireproof) state.fx.push({ type: 'text', x: h.x, y: h.y - 0.6, text: 'feuerfest', tone: 'info', cue: 'fireproof' });
       else damage(state, h, card.damage * pw);
     }
     return { ok: true };

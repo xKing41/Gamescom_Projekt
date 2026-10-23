@@ -86,6 +86,8 @@ kbd { font: 700 0.72rem/1 var(--f-body); }
 .stats dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gold-soft); }
 
 .bar-actions { display: flex; gap: 6px; }
+.icon-btn { display: inline-grid; place-items: center; min-width: 38px; padding-inline: 8px; }
+.icon-btn svg { display: block; }
 
 /* ── Bühne ── */
 
@@ -622,6 +624,43 @@ kbd { font: 700 0.72rem/1 var(--f-body); }
 .rules dd { margin: 0; color: var(--text); }
 .sheet .primary { justify-self: end; }
 
+/* ── Einstellungen ── */
+
+.settings { display: grid; gap: 12px; }
+.setting { display: grid; grid-template-columns: 140px minmax(0, 1fr) 54px; gap: 12px; align-items: center; }
+.setting > span { font-weight: 800; color: var(--gold-soft); }
+.setting > button { justify-self: start; grid-column: 2 / -1; }
+.setting output { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+.setting input[type="range"] { width: 100%; accent-color: var(--gold); }
+.settings-head { margin: 4px 0 0; font: 800 1.25rem/1.1 var(--f-display); color: var(--gold-soft); }
+.pad-details { display: grid; gap: 10px; }
+.pad-details[open] > summary { margin-bottom: 10px; }
+.pad-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+.pad-details > summary::-webkit-details-marker { display: none; }
+.pad-details > summary::after { content: "▸"; font: 700 0.9rem/1 var(--f-body); color: var(--muted); }
+.pad-details[open] > summary::after { content: "▾"; }
+.pad-details #pad-status { margin: 0 0 10px; }
+.pad-map div { grid-template-columns: 96px minmax(0, 1fr); }
+.pad-map dd { line-height: 1.9; }
+
+/* Tastenbilder für den Controller */
+.pad-glyph, .pad-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  padding: 0 0.35em;
+  border-radius: 0.8em;
+  border: 1px solid currentColor;
+  font: 800 0.78rem/1 var(--f-body);
+  vertical-align: 0.08em;
+}
+.primary .pad-glyph { border-color: var(--on-gold); }
+
+/* Mit Controller ist der Fokus immer deutlich zu sehen */
+body.pad :focus { outline: 3px solid var(--gold-soft); outline-offset: 2px; }
+body.pad #board { cursor: none; }
+
 /* ── Handy und schmale Fenster ── */
 
 @media (max-width: 860px) {
@@ -636,6 +675,9 @@ kbd { font: 700 0.72rem/1 var(--f-body); }
   .panel { padding: 12px; }
   .panel h2 { font-size: 1.55rem; }
   .rules div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .setting { grid-template-columns: minmax(0, 1fr) 54px; gap: 4px 12px; }
+  .setting > span { grid-column: 1 / -1; }
+  .setting > button { grid-column: 1 / -1; }
 
   /* Nachts zählt jeder Pixel: Karten in einer Reihe, Beschreibungen stehen in den Regeln */
   .phase-night { gap: 8px; }

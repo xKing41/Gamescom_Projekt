@@ -7,6 +7,8 @@ import { createRenderer } from './render.js';
 import { createUI } from './ui.js';
 import { createStore, loadLocal } from './storage.js';
 import { randomSeed, codeToSeed } from './rng.js';
+import { createAudio } from './audio.js';
+import { createPad } from './pad.js';
 
 const canvas = document.getElementById('board');
 const wrap = document.getElementById('board-wrap');
@@ -23,7 +25,12 @@ const view = {
   card: null,
   paused: false,
   speed: 1,
+  input: 'pointer', // 'pointer' | 'pad' – bestimmt Rahmen, Tastenhinweise und Fokus
+  cursor: null, // Controller-Rahmen in Feldern: { x, y }
+  aimUid: null, // Held, auf den der Controller gerade zielt
 };
+
+const audio = createAudio();
 
 const store = createStore(loadLocal() ?? Meta.newProfile(), () => {
   // Auf einem anderen Gerät wurde weitergespielt: Höhle mit dem zusammengeführten Stand neu zeigen
@@ -37,6 +44,9 @@ const app = {
   finished: false,
   view,
   act,
+  audio,
+  pad: null,
+  onRender: () => app.pad?.afterRender(),
   get profile() {
     return store.get();
   },
@@ -172,6 +182,7 @@ function act(type, p = {}) {
       if (!view.held) return;
       const result = Sim.discardItem(s, view.held);
       ui.toast(result.ok ? `${TREASURES[result.id].name} weggeworfen.` : result.reason);
+      audio.ui(result.ok ? 'drop' : 'error');
       view.held = null;
       break;
     }
@@ -206,42 +217,78 @@ function selectCard(id) {
   if (app.mode !== 'run' || s.phase !== 'night' || !s.opts.cards.includes(id)) return;
   const card = CARD_BY_ID[id];
   if (s.glut < card.cost) {
-    ui.toast('Zu wenig Glut.');
+    fail('Zu wenig Glut.');
     return;
   }
   if (card.target === 'none') {
     const result = Sim.playCard(s, id);
-    if (!result.ok) ui.toast(result.reason);
+    if (!result.ok) fail(result.reason);
     view.card = null;
   } else {
     view.card = view.card === id ? null : id;
+    if (view.card) audio.ui('select');
   }
+  ui.tick();
+}
+
+function fail(reason) {
+  ui.toast(reason);
+  audio.ui('error');
+}
+
+// Zielt mit der gewählten Karte: auf ein Feld { c, r } oder einen Helden { uid }
+function cast(target) {
+  const result = Sim.playCard(app.state, view.card, target);
+  if (result.ok) view.card = null;
+  else fail(result.reason);
   ui.tick();
 }
 
 function castAt(clientX, clientY) {
   const s = app.state;
   const card = CARD_BY_ID[view.card];
-  let result;
   if (card.target === 'tile') {
     const cell = renderer.cellAt(clientX, clientY);
-    if (!cell) return;
-    result = Sim.playCard(s, card.id, cell);
-  } else {
-    const hero = renderer.heroAt(s, clientX, clientY, 0.9);
-    result = hero ? Sim.playCard(s, card.id, { uid: hero.uid }) : { ok: false, reason: 'Tippe direkt auf einen Helden.' };
+    if (cell) cast(cell);
+    return;
   }
-  if (result.ok) view.card = null;
-  else ui.toast(result.reason);
-  ui.tick();
+  const hero = renderer.heroAt(s, clientX, clientY, 0.9);
+  if (hero) cast({ uid: hero.uid });
+  else fail('Tippe direkt auf einen Helden.');
 }
 
 function place(from, cell) {
-  const result = Sim.moveItem(app.state, from, cell.c, cell.r);
+  const s = app.state;
+  const id = from.where === 'tray' ? s.tray[from.i]?.id : Sim.itemAt(s, from.c, from.r)?.id;
+  const result = Sim.moveItem(s, from, cell.c, cell.r);
   if (result.kind === 'merge') ui.toast(`Verschmolzen: ${TREASURES[result.id].name}`);
-  else if (!result.ok && result.reason) ui.toast(result.reason);
+  else if (result.ok && id) audio.ui('place', { c: cell.c, weight: TREASURES[id].weight });
+  else if (!result.ok && result.reason) fail(result.reason);
   view.held = null;
   ui.render();
+}
+
+// Antippen eines Hortfelds am Tag: Schatz aufnehmen oder den gehaltenen dort ablegen
+function tapCell(cell) {
+  if (!inDay()) return;
+  if (view.held) {
+    place(view.held, cell);
+    return;
+  }
+  if (Sim.itemAt(app.state, cell.c, cell.r)) {
+    view.held = { where: 'hoard', c: cell.c, r: cell.r };
+    audio.ui('pickup', { c: cell.c });
+    ui.render();
+  }
+}
+
+function cancel() {
+  view.card = null;
+  if (view.held) {
+    view.held = null;
+    ui.render();
+  }
+  ui.tick();
 }
 
 const inDay = () => app.mode === 'run' && Sim.DAY_PHASES.has(app.state.phase);
@@ -250,6 +297,7 @@ const inDay = () => app.mode === 'run' && Sim.DAY_PHASES.has(app.state.phase);
 
 canvas.addEventListener('pointerdown', (e) => {
   const s = app.state;
+  app.pad.setInput('pointer');
   if (!s || app.mode !== 'run') return;
   view.pointerType = e.pointerType;
   view.pointer = { x: e.clientX, y: e.clientY };
@@ -266,6 +314,11 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (view.input === 'pad') {
+    // Erst eine echte Bewegung der Maus schaltet vom Controller zurück
+    if (Math.abs(e.movementX) + Math.abs(e.movementY) < 3) return;
+    app.pad.setInput('pointer');
+  }
   view.pointerType = e.pointerType;
   view.pointer = { x: e.clientX, y: e.clientY };
   view.hover = app.mode === 'run' ? renderer.cellAt(e.clientX, e.clientY) : null;
@@ -286,8 +339,7 @@ canvas.addEventListener('pointerup', (e) => {
       if (cell) place(drag.from, cell);
       return;
     }
-    view.held = drag.from;
-    ui.render();
+    tapCell(drag.from);
     return;
   }
   if (view.held && cell) place(view.held, cell);
@@ -311,15 +363,11 @@ window.addEventListener('keydown', (e) => {
     selectCard(s.opts.cards[Number(e.key) - 1]);
     e.preventDefault();
   } else if (e.key === 'Escape') {
-    for (const id of ['help', 'book']) {
-      const el = document.getElementById(id);
-      if (!el.hidden) el.hidden = true;
-    }
-    view.card = null;
-    if (view.held) {
-      view.held = null;
-      ui.render();
-    }
+    ui.closeOverlays();
+    cancel();
+  } else if (e.key === 'm' || e.key === 'M') {
+    audio.setMuted(!audio.settings.muted);
+    ui.toast(audio.settings.muted ? 'Ton aus. M schaltet ihn wieder ein.' : 'Ton an.');
     ui.tick();
   } else if (e.key === ' ' && night) {
     act('pause');
@@ -336,8 +384,10 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  app.pad.poll(dt);
   const s = app.state;
-  if (s && app.mode === 'run' && s.phase === 'night' && !view.paused) {
+  // Solange Regeln, Hortbuch oder Einstellungen offen sind, steht die Nacht still
+  if (s && app.mode === 'run' && s.phase === 'night' && !view.paused && !ui.overlayOpen()) {
     const aiming = view.card && CARD_BY_ID[view.card].target !== 'none';
     Sim.update(s, dt * view.speed * (aiming ? 0.3 : 1));
     if (s.phase !== 'night') {
@@ -347,16 +397,48 @@ function frame(now) {
       else ui.render();
     }
   }
+  audio.update(s, app.mode, view);
+  if (s?.fx.length) {
+    audio.effects(s.fx);
+    app.pad.effects(s.fx);
+  }
   renderer.draw(s, view, now / 1000);
   ui.tick();
   requestAnimationFrame(frame);
 }
 
+app.pad = createPad(app, {
+  ui,
+  renderer,
+  actions: {
+    tapCell,
+    selectCard,
+    cast,
+    cancel,
+    fail,
+    pickTray: (i) => act('pick-tray', { i }),
+    closeOverlays: () => ui.closeOverlays(),
+    openHelp: () => ui.openHelp(),
+    openSettings: () => ui.openSettings(),
+    bookTab: (step) => ui.bookTab(step),
+  },
+});
+
+// Der Ton darf erst nach einer Eingabe starten. Die Desktop-Fassung darf sofort.
+for (const type of ['pointerdown', 'pointerup', 'keydown', 'click']) window.addEventListener(type, () => audio.unlock(), { capture: true, passive: true });
+if (window.hortDesktop) audio.unlock();
+
+// Leiser Klick für Knöpfe; Karten haben ihren eigenen Klang
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest?.('button');
+  if (btn && !btn.disabled && btn.dataset.action !== 'card') audio.ui('click');
+}, true);
+
 new ResizeObserver(() => renderer.resize(wrap.clientWidth, wrap.clientHeight)).observe(wrap);
 renderer.resize(wrap.clientWidth, wrap.clientHeight);
 
 // Für Tests und zum Ausprobieren in der Konsole
-window.__hort = { app, renderer, Sim, Meta, store, showHub, finishRun };
+window.__hort = { app, renderer, Sim, Meta, store, audio, showHub, finishRun };
 
 function seedFromHash() {
   const m = /^#([0-9a-z]{1,7})$/i.exec(location.hash);

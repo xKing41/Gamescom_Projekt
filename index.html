@@ -28,6 +28,7 @@
       <button id="btn-speed" class="ghost small" type="button" title="Tempo umschalten (F)">1×</button>
       <button id="btn-pause" class="ghost small" type="button" title="Pause (Leertaste)" disabled>Pause</button>
       <button id="btn-help" class="ghost small" type="button">Regeln</button>
+      <button id="btn-settings" class="ghost small icon-btn" type="button" aria-label="Ton und Einstellungen" title="Ton und Einstellungen (M schaltet stumm)"></button>
     </div>
   </header>
   <main class="stage">
@@ -54,9 +55,28 @@
       <div><dt>Erfahrung</dt><dd>Jeder Run bringt deiner Drachenart Erfahrung, auch ein verlorener. Jede Stufe im Drachenalter schaltet etwas frei.</dd></div>
       <div><dt>Schlüpfen</dt><dd>Die acht Felder rund ums Ei entscheiden, welcher Drache schlüpft. Eine neue Art hat eigene Regeln.</dd></div>
       <div><dt>Erzfeinde</dt><dd>Wer mit einem wertvollen Schatz entkommt, kommt in einem späteren Run zurück – mit deinem Schatz.</dd></div>
-      <div><dt>Tasten</dt><dd>1–4 Atem-Karten · Leertaste Pause · F Tempo · Esc abbrechen</dd></div>
+      <div><dt>Tasten</dt><dd>1–4 Atem-Karten · Leertaste Pause · F Tempo · M Ton · Esc abbrechen</dd></div>
+      <div><dt>Controller</dt><dd>Die Belegung steht in den Einstellungen (Lautsprecher oben rechts).</dd></div>
     </dl>
     <button class="primary" type="button" id="btn-help-close">Verstanden</button>
+  </div>
+</div>
+<div class="overlay" id="settings" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title">Einstellungen</h2>
+    <div class="settings">
+      <label class="setting" for="vol-sfx"><span>Effekte</span><input type="range" id="vol-sfx" min="0" max="100" step="5"><output id="vol-sfx-out" for="vol-sfx">80&nbsp;%</output></label>
+      <label class="setting" for="vol-music"><span>Musik und Höhle</span><input type="range" id="vol-music" min="0" max="100" step="5"><output id="vol-music-out" for="vol-music">70&nbsp;%</output></label>
+      <div class="setting"><span>Ton</span><button class="ghost small" type="button" id="btn-mute" aria-pressed="false">Stumm schalten</button></div>
+      <div class="setting" id="row-fullscreen"><span>Bild</span><button class="ghost small" type="button" id="btn-fullscreen">Vollbild</button></div>
+    </div>
+    <p class="muted" id="audio-note" hidden>Dieser Browser kann keinen Ton erzeugen.</p>
+    <details class="pad-details" id="pad-details">
+      <summary class="settings-head">Controller</summary>
+      <p class="muted" id="pad-status">Schließe einen Controller an und drücke eine Taste.</p>
+      <dl class="rules pad-map" id="pad-map"></dl>
+    </details>
+    <button class="primary" type="button" id="btn-settings-close">Fertig</button>
   </div>
 </div>
 <div class="overlay" id="book" hidden>

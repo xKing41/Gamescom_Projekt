@@ -1,5 +1,6 @@
 // Browser-Test: spielt in Chromium über die echte Oberfläche – Höhle, Tag, Nacht, Run-Ende,
-// Hortbuch, Neuladen mit Spielstand, voll freigeschalteter Stand und ein Hort-Code-Link.
+// Hortbuch, Neuladen mit Spielstand, voll freigeschalteter Stand, Einstellungen und ein Hort-Code-Link.
+// Danach einen ganzen Tag und eine Nacht nur mit einem simulierten Controller.
 // Speichert Bildschirmfotos. Braucht Playwright (lokal oder global installiert).
 //
 //   npm run build && npm run e2e [Ordner für Bilder]
@@ -179,6 +180,33 @@ for (const vp of viewports) {
   await page.waitForTimeout(150);
   await shot('7-hoehle-voll-unten');
 
+  // Einstellungen: Lautstärke, Stummschalten, gespeichert im Browser
+  await page.click('#btn-settings');
+  await page.waitForTimeout(150);
+  check(await page.evaluate(() => !document.getElementById('settings').hidden), 'Einstellungen öffnen nicht');
+  await page.locator('#vol-music').fill('30');
+  check(await page.evaluate(() => window.__hort.audio.settings.music === 0.3), 'Musik-Lautstärke wird nicht übernommen');
+  check((await overflow()) <= 0, 'Einstellungen sind zu breit');
+  await shot('10-einstellungen');
+  await page.click('#btn-mute');
+  check(await page.evaluate(() => window.__hort.audio.settings.muted === true), 'Stummschalten klappt nicht');
+  check(await page.evaluate(() => document.querySelector('#btn-settings path:nth-child(2)')?.getAttribute('d')?.startsWith('M16 9.5')), 'Kopfzeile zeigt Stumm nicht an');
+  await page.click('#btn-mute');
+  await page.click('#btn-settings-close');
+  check(await page.evaluate(() => document.getElementById('settings').hidden), 'Einstellungen schließen nicht');
+  check(await page.evaluate(() => JSON.parse(localStorage.getItem('hort.audio.v1')).music === 0.3), 'Lautstärke wird nicht gespeichert');
+  // Klang in Echtzeit: jedes Geräusch einmal abspielen, ohne Fehler
+  const sound = await page.evaluate(async () => {
+    const { audio } = window.__hort;
+    audio.unlock();
+    await new Promise((r) => setTimeout(r, 300));
+    if (!audio.running) return 'aus';
+    for (const name of ['claw', 'fire', 'roar', 'merge', 'grab', 'nightfall', 'hatch', 'click']) audio.play(name, { pan: 0.2 });
+    await new Promise((r) => setTimeout(r, 500));
+    return 'an';
+  });
+  if (vp.name === 'desktop') console.log(`  Ton im Test-Browser: ${sound}`);
+
   // Run mit Kristalldrache, Legende 4 und Erzfeinden bis in die zweite Nacht
   await page.click('[data-action="start-run"]');
   const opts = await page.evaluate(() => window.__hort.app.state.opts);
@@ -210,6 +238,156 @@ for (const vp of viewports) {
   check(codeRun.phase === 'raid' && codeRun.opts.mode === 'code' && codeRun.opts.species === 'gold' && codeRun.seed === 1069533073, 'Hort-Code startet keinen Standard-Run');
 
   console.log(`${vp.name}: ${errors.length ? `${errors.length} Fehler` : 'ok'}`);
+  for (const e of errors) console.log(`  · ${e}`);
+  if (errors.length) failed = true;
+  await page.close();
+}
+
+// ── Controller ──
+// Ein simuliertes Xbox-Gamepad ersetzt navigator.getGamepads; alles läuft nur über Tasten.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !/Failed to load resource|fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text());
+  });
+  const check = (ok, message) => {
+    if (!ok) errors.push(message);
+  };
+  const shot = (name) => page.screenshot({ path: path.join(outDir, `controller-${name}.png`) });
+  await page.addInitScript(() => {
+    const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
+    const pad = { id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', index: 0, connected: true, mapping: 'standard', buttons, axes: [0, 0, 0, 0], timestamp: 0 };
+    window.__pad = pad;
+    Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value: () => [pad, null, null, null] });
+  });
+  const BTN = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, back: 8, start: 9, up: 12, down: 13, left: 14, right: 15 };
+  const press = async (name) => {
+    await page.evaluate((i) => Object.assign(window.__pad.buttons[i], { pressed: true, value: 1 }), BTN[name]);
+    await page.waitForTimeout(90);
+    await page.evaluate((i) => Object.assign(window.__pad.buttons[i], { pressed: false, value: 0 }), BTN[name]);
+    await page.waitForTimeout(90);
+  };
+  const st = () => page.evaluate(() => {
+    const { app } = window.__hort;
+    const v = app.view;
+    return { mode: app.mode, phase: app.state.phase, input: v.input, card: v.card, held: v.held, cursor: v.cursor, aim: v.aimUid, paused: v.paused, tray: app.state.tray.length, glut: app.state.glut, focus: document.activeElement?.dataset?.action ?? document.activeElement?.id };
+  });
+  // Rahmen per Steuerkreuz auf ein Feld fahren
+  const moveTo = async (c, r) => {
+    for (let k = 0; k < 12; k++) {
+      const cur = await st();
+      const cc = Math.floor(cur.cursor.x);
+      const cr = Math.floor(cur.cursor.y);
+      if (cc === c && cr === r) return true;
+      await press(cc < c ? 'right' : cc > c ? 'left' : cr < r ? 'down' : 'up');
+    }
+    return false;
+  };
+  const freeCell = () => page.evaluate(() => {
+    const { app, Sim } = window.__hort;
+    for (let r = 5; r >= 2; r--) for (let c = 3; c <= 8; c++) if (!Sim.itemAt(app.state, c, r)) return { c, r };
+    return null;
+  });
+
+  await page.goto(url);
+  await page.waitForFunction(() => window.__hort?.app?.state);
+  await page.waitForTimeout(300);
+  await press('a');
+  let s = await st();
+  check(s.input === 'pad' && s.mode === 'hub', 'Der erste Druck soll nur den Controller wecken');
+  check(s.focus === 'start-run', `Fokus liegt nicht auf dem Startknopf (${s.focus})`);
+  await press('back');
+  check(await page.evaluate(() => !document.getElementById('help').hidden), 'View öffnet die Regeln nicht');
+  await press('b');
+  check(await page.evaluate(() => document.getElementById('help').hidden), 'B schließt die Regeln nicht');
+  await press('start');
+  check(await page.evaluate(() => !document.getElementById('settings').hidden), 'Menü öffnet die Einstellungen nicht');
+  const before = await page.evaluate(() => window.__hort.audio.settings.sfx);
+  await press('left');
+  check(await page.evaluate((b) => window.__hort.audio.settings.sfx < b, before), 'Steuerkreuz verstellt die Lautstärke nicht');
+  await shot('1-einstellungen');
+  await press('b');
+  await shot('2-hoehle');
+  await press('y');
+  check((await st()).phase === 'raid', 'Y startet keinen Run');
+  await press('a');
+  check((await st()).phase === 'loot', 'A wählt kein Raubziel');
+  await press('a');
+  await press('down');
+  await press('a');
+  await press('y');
+  s = await st();
+  check(s.phase === 'arrange', `Beute mitnehmen per Controller klappt nicht (${s.phase})`);
+
+  // Neue Beute mit RB holen und auf freie Felder legen
+  for (let k = 0; k < 2; k++) {
+    await press('rb');
+    s = await st();
+    check(s.held?.where === 'tray', 'RB nimmt keine neue Beute');
+    const free = await freeCell();
+    check(await moveTo(free.c, free.r), 'Rahmen erreicht das Feld nicht');
+    if (k === 0) await shot('3-beute-halten');
+    await press('a');
+  }
+  check((await st()).tray === 0, 'Beute liegt noch im Tablett');
+
+  // Einen Schatz im Hort umlegen
+  const coin = await page.evaluate(() => {
+    const { app, Sim } = window.__hort;
+    for (let r = 2; r <= 5; r++) for (let c = 3; c <= 8; c++) {
+      const it = Sim.itemAt(app.state, c, r);
+      if (it && it.id !== 'ei') return { c, r, uid: it.uid };
+    }
+    return null;
+  });
+  await moveTo(coin.c, coin.r);
+  await press('a');
+  check((await st()).held?.where === 'hoard', 'A nimmt keinen Schatz auf');
+  const target = await freeCell();
+  await moveTo(target.c, target.r);
+  await press('a');
+  const moved = await page.evaluate(([c, r]) => window.__hort.Sim.itemAt(window.__hort.app.state, c, r)?.uid, [target.c, target.r]);
+  check(moved === coin.uid, 'Schatz wurde nicht umgelegt');
+  await shot('4-hort');
+
+  await press('y');
+  check((await st()).phase === 'night', 'Y beginnt die Nacht nicht');
+
+  // Nacht: Feueratem auf den gefährlichsten Helden, dann Zuschnappen
+  await page.waitForFunction(() => window.__hort.Sim.activeHeroes(window.__hort.app.state).length > 0, null, { timeout: 20000 });
+  await page.waitForTimeout(600);
+  await press('lb');
+  s = await st();
+  check(s.card === 'feuer', 'LB wählt den Feueratem nicht');
+  const keyLabel = await page.evaluate(() => document.querySelector('#card-feuer kbd')?.textContent);
+  check(keyLabel === 'LB', `Karten zeigen nicht die Xbox-Tasten (${keyLabel})`);
+  await shot('5-feuer-zielen');
+  const glutBefore = s.glut;
+  await press('a');
+  check((await st()).glut < glutBefore, 'A setzt den Feueratem nicht ein');
+  await page.waitForFunction(() => {
+    const { app, Sim } = window.__hort;
+    return Sim.activeHeroes(app.state).some((h) => Sim.distToDragon(h.x, h.y) <= 3.5) && app.state.glut >= 1;
+  }, null, { timeout: 40000 }).catch(() => {});
+  await press('rb');
+  s = await st();
+  if (s.card === 'schnapp' && s.aim != null) {
+    await shot('6-schnappen-zielen');
+    const g = s.glut;
+    await press('a');
+    check((await st()).glut < g, 'A schnappt nicht zu');
+  } else {
+    check(s.card === 'schnapp', 'RB wählt Zuschnappen nicht');
+    await press('b');
+  }
+  await press('start');
+  check((await st()).paused === true, 'Menü pausiert die Nacht nicht');
+  await press('start');
+  check((await st()).paused === false, 'Menü setzt die Nacht nicht fort');
+
+  console.log(`controller: ${errors.length ? `${errors.length} Fehler` : 'ok'}`);
   for (const e of errors) console.log(`  · ${e}`);
   if (errors.length) failed = true;
   await page.close();

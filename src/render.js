@@ -398,9 +398,12 @@ export function createRenderer(canvas) {
           }
         }
         if (view.hover && view.hover.c === c && view.hover.r === r) {
-          ctx.strokeStyle = 'rgba(243,217,141,0.7)';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x + 1.5, y + 1.5, T - 3, T - 3);
+          // Mit Controller ein kräftiger Rahmen, damit man ihn auf dem Sofa sieht
+          const pad = view.input === 'pad';
+          ctx.strokeStyle = pad ? `rgba(243,217,141,${0.75 + 0.25 * Math.sin(time * 6)})` : 'rgba(243,217,141,0.7)';
+          ctx.lineWidth = pad ? Math.max(3, T * 0.07) : 2;
+          const inset = pad ? ctx.lineWidth / 2 + 1 : 1.5;
+          ctx.strokeRect(x + inset, y + inset, T - inset * 2, T - inset * 2);
         }
       }
     }
@@ -555,6 +558,22 @@ export function createRenderer(canvas) {
         ctx.arc(px, py, T * 0.42, 0, TAU);
         ctx.stroke();
       }
+      if (view.aimUid === h.uid) {
+        // Ziel des Controllers: pulsierender Ring und ein Pfeil darüber
+        const pulse = 0.5 + 0.5 * Math.sin(time * 9);
+        ctx.strokeStyle = '#f3d98d';
+        ctx.lineWidth = T * (0.07 + 0.03 * pulse);
+        ctx.beginPath();
+        ctx.arc(px, py, T * (0.5 + 0.04 * pulse), 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = '#f3d98d';
+        ctx.beginPath();
+        ctx.moveTo(px, py - T * 0.62);
+        ctx.lineTo(px - T * 0.14, py - T * 0.84);
+        ctx.lineTo(px + T * 0.14, py - T * 0.84);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   }
 
@@ -579,6 +598,20 @@ export function createRenderer(canvas) {
 
   function drawTargeting(state, view) {
     if (state.phase !== 'night' || !view.card) return;
+    if (view.input === 'pad' && view.cursor && CARD_BY_ID[view.card]?.target === 'tile') {
+      // Fadenkreuz am genauen Zielpunkt des Sticks
+      const x = view.cursor.x * T;
+      const y = view.cursor.y * T;
+      ctx.strokeStyle = '#f3d98d';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, T * 0.18, 0, TAU);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        ctx.moveTo(x + dx * T * 0.1, y + dy * T * 0.1);
+        ctx.lineTo(x + dx * T * 0.32, y + dy * T * 0.32);
+      }
+      ctx.stroke();
+    }
     if ((view.card === 'feuer' || view.card === 'rauch') && view.hover) {
       const { c, r } = view.hover;
       ctx.fillStyle = 'rgba(255,138,61,0.18)';
@@ -605,7 +638,8 @@ export function createRenderer(canvas) {
     if (!view.pointer) return;
     const dragging = view.drag?.moved;
     const trayHeld = view.held?.where === 'tray' && view.pointerType === 'mouse';
-    if (!dragging && !trayHeld) return;
+    const padHeld = view.held && view.input === 'pad';
+    if (!dragging && !trayHeld && !padHeld) return;
     const item = heldItem(state, view);
     if (!item) return;
     const rect = canvas.getBoundingClientRect();
