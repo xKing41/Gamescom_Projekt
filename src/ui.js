@@ -84,6 +84,7 @@ export function createUI(app) {
     settingsClose: $('btn-settings-close'),
     mute: $('btn-mute'),
     fullscreen: $('btn-fullscreen'),
+    quit: $('btn-quit'),
   };
   const help = $('help');
   const book = $('book');
@@ -197,6 +198,7 @@ export function createUI(app) {
     $('audio-note').hidden = audio.supported;
     const full = desktop ? desktop.isFullscreen?.() : !!document.fullscreenElement;
     $('row-fullscreen').hidden = !(desktop?.setFullscreen || document.fullscreenEnabled);
+    $('row-quit').hidden = !desktop?.quit;
     Promise.resolve(full).then((on) => {
       buttons.fullscreen.textContent = on ? 'Fenster' : 'Vollbild';
     });
@@ -247,6 +249,7 @@ export function createUI(app) {
     }
     setTimeout(syncSettings, 150);
   });
+  buttons.quit.addEventListener('click', () => desktop?.quit());
   document.addEventListener('fullscreenchange', () => {
     if (!settingsEl.hidden) syncSettings();
   });

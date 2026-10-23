@@ -1,0 +1,142 @@
+name: Desktop bauen
+
+# Baut die Desktop-Fassung von Hort für Windows und Linux und legt sie unter festen Links ab:
+#   https://github.com/<besitzer>/<repo>/releases/download/desktop/Hort-Windows.zip
+#   https://github.com/<besitzer>/<repo>/releases/download/desktop/Hort-Linux.tar.gz
+# Entpacken, dann Hort.exe (Windows) bzw. start-hort.sh (Linux) starten.
+# Der Inhalt der Ordner ist später genau das, was in die Steam-Depots kommt.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master, 'ccr-**', 'claude/**']
+    paths-ignore: ['**.md']
+
+# Kommt ein neuer Push, während noch gebaut wird: alten Lauf abbrechen.
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruefen:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Abhängigkeiten
+        run: npm ci --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Meta-Tests und Balance-Bot
+        run: npm test
+
+  bauen:
+    name: ${{ matrix.name }}
+    needs: pruefen
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            flags: --win --x64
+            dir: win-unpacked
+            file: Hort-Windows.zip
+          - name: Linux
+            os: ubuntu-latest
+            flags: --linux --x64
+            dir: linux-unpacked
+            file: Hort-Linux.tar.gz
+
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Abhängigkeiten
+        run: npm ci --no-audit --no-fund
+
+      - name: Spiel bauen
+        run: node tools/build.mjs
+
+      # Versionsnummer steigt mit jedem Build
+      - name: Desktop-Paket schnüren
+        shell: bash
+        run: npx electron-builder ${{ matrix.flags }} --dir --publish never -c.extraMetadata.version=0.3.${{ github.run_number }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Archiv packen
+        shell: bash
+        run: |
+          set -e
+          mkdir -p out
+          mv "release/${{ matrix.dir }}" release/Hort
+          if [ "${{ matrix.name }}" = "Windows" ]; then
+            (cd release && 7z a -tzip "../out/${{ matrix.file }}" Hort > /dev/null)
+          else
+            chmod +x release/Hort/hort release/Hort/start-hort.sh
+            tar -czf "out/${{ matrix.file }}" -C release Hort
+          fi
+          ls -la out
+
+      - name: Als Artifact bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hort-${{ matrix.name }}
+          path: out/${{ matrix.file }}
+          if-no-files-found: error
+          retention-days: 30
+
+  # Fester Download-Link: Release "desktop" wird bei jedem Build ersetzt.
+  veroeffentlichen:
+    name: Download-Links
+    needs: bauen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Builds holen
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Download-Links aktualisieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          ls -la out
+          BASE="https://github.com/$REPO/releases/download/desktop"
+          gh release delete desktop --repo "$REPO" --cleanup-tag --yes || true
+          gh release create desktop out/Hort-Windows.zip out/Hort-Linux.tar.gz \
+            --repo "$REPO" \
+            --target "$GITHUB_SHA" \
+            --title "Hort – Desktop (Build ${{ github.run_number }})" \
+            --notes "Windows: $BASE/Hort-Windows.zip – entpacken, Hort.exe starten. Linux: $BASE/Hort-Linux.tar.gz – entpacken, start-hort.sh starten. Stand: ${GITHUB_SHA::7} (${{ github.ref_name }})" \
+            --latest
+          {
+            echo "### 🐉 Hort für den PC"
+            echo "- Windows: $BASE/Hort-Windows.zip"
+            echo "- Linux: $BASE/Hort-Linux.tar.gz"
+          } >> "$GITHUB_STEP_SUMMARY"

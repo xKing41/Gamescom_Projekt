@@ -1,6 +1,6 @@
 # HORT – Konzept
 
-> Arbeitstitel. Stand: 23.10.2026 – der Prototyp (v0.2) setzt die Kniffe und die Meta-Progression bis zum Early-Access-Umfang um; was noch fehlt, steht unter „Ausbaustufen“.
+> Arbeitstitel. Stand: 23.10.2026 – der Prototyp (v0.3) setzt die Kniffe und die Meta-Progression bis zum Early-Access-Umfang um und läuft mit Ton, Controller und als Desktop-Fassung; was noch fehlt, steht unter „Ausbaustufen“.
 > Ziel: Steam-Demo zum Next Fest im Juni 2027, Stand auf der gamescom im August 2027.
 
 ## In einem Satz
@@ -194,7 +194,11 @@ Battle Pass, Lootboxen, Saison-Pass, tägliche Aufgaben mit Ablaufdatum, Belohnu
 
 ### Ausbaustufen
 
-Umgesetzt im Prototyp v0.2: drei Nachbarreiche aus fünf, Brutkammer mit vier Arten und Farbvarianten, Drachenalter (3 Stufen je Art), Legende 1–10, Erzfeinde, Hortbuch, 8 Taten, Endlose Belagerung, Wochen-Hort mit eigenem Bestwert, Hort-Codes, Speicherstand über Geräte hinweg. Noch offen sind Legende 11–20, Steam-Bestenlisten, Twitch-Helden, Flüche, die wachsende Höhle, der Workshop und Koop.
+Umgesetzt im Prototyp v0.2: drei Nachbarreiche aus fünf, Brutkammer mit vier Arten und Farbvarianten, Drachenalter (3 Stufen je Art), Legende 1–10, Erzfeinde, Hortbuch, 8 Taten, Endlose Belagerung, Wochen-Hort mit eigenem Bestwert, Hort-Codes, Speicherstand über Geräte hinweg.
+
+Dazu in v0.3: Ton komplett aus dem Code (Effekte, Höhlenatmosphäre, Harfe, Herzschlag bei Gefahr), Controller für Xbox, PlayStation und Steam Deck, eine Desktop-Fassung für Windows und Linux mit Spielstand-Datei für die Steam Cloud und automatischen Builds. Wie es von hier zu Steam geht, steht in [STEAM.md](STEAM.md).
+
+Noch offen sind die Steam-Anbindung (Erfolge für die Taten, Bestenlisten für Endlos und Wochen-Hort), Legende 11–20, Twitch-Helden, Flüche, die wachsende Höhle, der Workshop und Koop.
 
 | Stufe | Inhalt |
 |---|---|

@@ -1,16 +1,57 @@
 {
   "name": "hort",
+  "productName": "Hort",
   "private": true,
-  "version": "0.2.0",
-  "description": "Hort – Prototyp: Du bist der Drache, dein Goldhaufen ist dein Inventar.",
+  "version": "0.3.0",
+  "description": "Hort – Du bist der Drache, dein Goldhaufen ist dein Inventar.",
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "node tools/serve.mjs",
     "build": "node tools/build.mjs",
     "test": "node tools/meta-test.mjs && node tools/balance.mjs",
-    "e2e": "node tools/e2e.mjs"
+    "e2e": "node tools/e2e.mjs",
+    "audio": "node tools/audio-check.mjs",
+    "desktop": "node tools/build.mjs && electron .",
+    "pack": "node tools/build.mjs && electron-builder --dir --publish never"
+  },
+  "build": {
+    "appId": "io.github.xking41.hort",
+    "productName": "Hort",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "desktop/*.cjs",
+      "dist/desktop/**",
+      "package.json"
+    ],
+    "asar": true,
+    "electronLanguages": [
+      "de",
+      "en-US"
+    ],
+    "win": {
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Game",
+      "executableName": "hort",
+      "extraFiles": [
+        {
+          "from": "desktop/linux/start-hort.sh",
+          "to": "start-hort.sh"
+        }
+      ]
+    }
   },
   "devDependencies": {
+    "@fontsource/alegreya-sans": "5.3.0",
+    "@fontsource/grenze-gotisch": "5.3.0",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
     "esbuild": "0.28.2"
   }
 }

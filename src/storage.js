@@ -1,5 +1,6 @@
-// Speichert das Profil: immer im Browser, und als Claude-Artifact zusätzlich in der Datenbank,
-// damit derselbe Stand am Handy und am PC gilt. In der Steam-Fassung kommt hier später die Steam Cloud dazu.
+// Speichert das Profil: immer im Browser, dazu an einem zweiten Ort –
+// als Claude-Artifact in der Datenbank (derselbe Stand am Handy und am PC),
+// in der Desktop-Fassung als Datei im Spielordner, die die Steam Cloud abgleicht.
 
 import { sanitizeProfile, mergeProfiles, sameProfile } from './meta.js';
 
@@ -22,8 +23,38 @@ function saveLocal(profile) {
   }
 }
 
-// Verbindet sich mit der Datenbank des Artifacts, falls vorhanden.
-// onMerged bekommt einen zusammengeführten Stand, wenn auf einem anderen Gerät weitergespielt wurde.
+// Der zweite Speicherort, falls es einen gibt: { get, set }
+async function openBackend() {
+  const desktop = window.hortDesktop?.profile;
+  if (desktop) {
+    return {
+      get: async () => {
+        const raw = await desktop.load();
+        return raw ? JSON.parse(raw) : null;
+      },
+      set: (p) => desktop.save(JSON.stringify(p)),
+      delay: 0,
+    };
+  }
+  const use = window.claude?.use;
+  if (typeof use !== 'function') return null;
+  const [db, user] = await Promise.all([use.call(window.claude, 'db'), use.call(window.claude, 'user')]);
+  if (!db || !user) return null;
+  const id = await user.id();
+  if (!id) return null;
+  const ref = db.doc(`data/users/${id}/hort`);
+  return {
+    get: async () => {
+      const snap = await ref.get();
+      return snap.exists ? structuredClone(snap.data()) : null;
+    },
+    set: (p) => ref.set(p),
+    delay: 800,
+  };
+}
+
+// Verbindet sich mit dem zweiten Speicherort, falls vorhanden.
+// onMerged bekommt einen zusammengeführten Stand, wenn anderswo weitergespielt wurde.
 export function createStore(initial, onMerged) {
   let profile = initial;
   let cloud = null;
@@ -49,17 +80,12 @@ export function createStore(initial, onMerged) {
   }
 
   async function connect() {
-    const use = window.claude?.use;
-    if (typeof use !== 'function') return;
     try {
-      const [db, user] = await Promise.all([use.call(window.claude, 'db'), use.call(window.claude, 'user')]);
-      if (!db || !user) return;
-      const id = await user.id();
-      if (!id) return;
-      const ref = db.doc(`data/users/${id}/hort`);
-      const snap = await ref.get();
-      cloud = ref;
-      const remote = snap.exists ? sanitizeProfile(structuredClone(snap.data())) : null;
+      const backend = await openBackend();
+      if (!backend) return;
+      const raw = await backend.get();
+      cloud = backend;
+      const remote = raw ? sanitizeProfile(raw) : null;
       const merged = mergeProfiles(profile, remote);
       if (!sameProfile(merged, profile)) {
         profile = merged;
@@ -74,11 +100,13 @@ export function createStore(initial, onMerged) {
 
   connect();
 
-  // Mehrere schnelle Änderungen (z. B. Karten durchschalten) werden zu einem Schreibvorgang
+  // Mehrere schnelle Änderungen (z. B. Karten durchschalten) werden zu einem Schreibvorgang.
+  // Die Datei der Desktop-Fassung wird sofort geschrieben, damit beim Beenden nichts fehlt.
   let timer = 0;
   const scheduleFlush = () => {
     clearTimeout(timer);
-    timer = setTimeout(flushCloud, 800);
+    if (cloud && !cloud.delay) flushCloud();
+    else timer = setTimeout(flushCloud, cloud?.delay ?? 800);
   };
 
   return {
