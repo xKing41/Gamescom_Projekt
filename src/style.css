@@ -1,0 +1,445 @@
+/* Layout: die Höhle als Bühne, daneben (am Handy darunter) eine Steintafel mit dem, was gerade zu tun ist.
+   Bewusst nur ein dunkles Erscheinungsbild – das Spiel findet in einer Höhle statt. */
+:root {
+  --cave: #15121a;
+  --stone: #221d27;
+  --stone-2: #2b2431;
+  --edge: #463b4d;
+  --gold: #e6b94f;
+  --gold-soft: #f3d98d;
+  --on-gold: #21170a;
+  --ember: #ff8a3d;
+  --ember-deep: #3a2216;
+  --moon: #a9c1d9;
+  --text: #f1e8da;
+  --muted: #b5a99b;
+  --good: #9be38f;
+  --bad: #ff6b6b;
+  --scrim: rgba(10, 8, 12, 0.74);
+  --f-display: "Grenze Gotisch", "UnifrakturMaguntia", Georgia, serif;
+  --f-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html {
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--cave);
+}
+
+*, *::before, *::after { box-sizing: inherit; }
+[hidden] { display: none !important; }
+
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--cave);
+  color: var(--text);
+  font: 16px/1.45 var(--f-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 2px; }
+img { max-width: 100%; }
+kbd { font: 700 0.72rem/1 var(--f-body); }
+
+/* ── Kopfzeile ── */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.brand {
+  margin: 0;
+  font: 800 2rem/1 var(--f-display);
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.stats div { display: flex; align-items: baseline; gap: 6px; }
+.stats dt { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stats dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gold-soft); }
+
+.bar-actions { display: flex; gap: 6px; }
+
+/* ── Bühne ── */
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 370px);
+  gap: 16px;
+  min-height: 0;
+}
+
+.board-wrap {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+#board {
+  display: block;
+  max-width: 100%;
+  border-radius: 10px;
+  touch-action: none;
+  box-shadow: 0 0 0 1px var(--edge), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.panel {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: linear-gradient(180deg, var(--stone), var(--stone-2));
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.phase { display: grid; gap: 12px; }
+
+.panel h2 {
+  margin: 0;
+  font: 800 1.85rem/1.05 var(--f-display);
+  color: var(--gold-soft);
+  text-wrap: balance;
+}
+
+.panel h2.big { font-size: 2.4rem; }
+
+.panel h3 {
+  margin: 4px 0 0;
+  font: 800 1.25rem/1.1 var(--f-display);
+  color: var(--gold-soft);
+}
+
+.panel p { margin: 0; }
+
+.eyebrow {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lead { color: var(--text); }
+.muted { color: var(--muted); font-size: 0.92rem; }
+.good { color: var(--good); }
+.note { color: var(--moon); font-size: 0.92rem; }
+
+.label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.icons { display: flex; flex-wrap: wrap; gap: 2px; }
+.icons img { display: block; }
+
+/* ── Knöpfe ── */
+
+.primary {
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 18px;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-weight: 800;
+}
+
+.primary:hover:not(:disabled) { background: var(--gold-soft); }
+.primary:disabled { opacity: 0.45; }
+
+.ghost {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ghost:hover:not(:disabled) { border-color: var(--gold); }
+.ghost:disabled { opacity: 0.4; }
+.small { padding: 6px 10px; font-size: 0.88rem; }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── Einstieg ── */
+
+.intro {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(230, 185, 79, 0.1);
+  border: 1px solid rgba(230, 185, 79, 0.35);
+}
+
+.intro .ghost { justify-self: start; }
+
+/* ── Raubziele ── */
+
+.choices { display: grid; gap: 8px; }
+
+.choice {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: var(--stone-2);
+}
+
+.choice:hover { border-color: var(--gold); }
+.choice-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.choice-head strong { font: 800 1.3rem/1 var(--f-display); color: var(--gold-soft); }
+.realm { font-size: 0.8rem; color: var(--moon); }
+.choice-text { color: var(--muted); font-size: 0.92rem; }
+.choice-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 6px; }
+
+/* ── Beute ── */
+
+.loot-list { display: grid; gap: 8px; }
+
+.loot {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  text-align: left;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: var(--stone-2);
+}
+
+.loot.is-on { border-color: var(--gold); background: rgba(230, 185, 79, 0.12); }
+.loot-body { display: grid; gap: 3px; min-width: 0; }
+.loot-body strong { color: var(--gold-soft); }
+.loot-text { font-size: 0.9rem; color: var(--muted); }
+
+.stats-line, .loot .stats, .item-info .stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.stats b { color: var(--text); }
+.changed { color: var(--moon); }
+
+/* ── Hort ordnen ── */
+
+.tray { display: grid; gap: 6px; }
+.tray-items { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tray-item {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: var(--stone-2);
+}
+
+.tray-item.is-on { border-color: var(--gold); background: rgba(230, 185, 79, 0.16); }
+
+.info {
+  min-height: 74px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.item-info { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: start; }
+.item-info > div { display: grid; gap: 3px; min-width: 0; }
+.item-info strong { color: var(--gold-soft); }
+
+.ravens {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(169, 193, 217, 0.3);
+  background: rgba(169, 193, 217, 0.06);
+}
+
+.ravens h3 { color: var(--moon); margin: 0; }
+.ravens ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ravens li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 0.92rem; }
+.ravens li strong { color: var(--text); }
+
+/* ── Nacht ── */
+
+.glut { display: flex; align-items: center; gap: 10px; }
+
+.pips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+
+.pips i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--ember);
+  background: linear-gradient(0deg, rgba(255, 138, 61, 0.55) var(--fill, 0%), transparent var(--fill, 0%));
+}
+
+.pips i.on { background: var(--ember); box-shadow: 0 0 8px rgba(255, 138, 61, 0.7); }
+.pips-num { margin-left: 4px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ember); }
+
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #6b3a22;
+  background: linear-gradient(180deg, #3d2519, var(--ember-deep));
+}
+
+.card strong { font: 800 1.12rem/1.05 var(--f-display); color: var(--gold-soft); }
+.card-text { font-size: 0.82rem; line-height: 1.3; color: var(--muted); }
+.card-top { display: flex; justify-content: space-between; align-items: center; }
+.card kbd { padding: 2px 6px; border-radius: 5px; border: 1px solid var(--edge); color: var(--muted); }
+.cost { display: flex; gap: 3px; }
+.cost i { width: 10px; height: 10px; border-radius: 50%; background: var(--ember); }
+.card:hover:not(:disabled) { border-color: var(--ember); }
+.card.is-active { border-color: var(--ember); box-shadow: 0 0 0 2px var(--ember), 0 0 18px rgba(255, 138, 61, 0.4); }
+.card:disabled { opacity: 0.42; }
+
+.hint { font-size: 0.92rem; color: var(--moon); }
+.foes { font-size: 0.86rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── Morgen und Ende ── */
+
+.summary { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; }
+.summary div { display: grid; }
+.summary dt { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.summary dd { margin: 0; font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gold-soft); }
+
+.stolen { display: grid; gap: 4px; }
+.species { font-size: 1.05rem; }
+.species strong { color: var(--gold-soft); }
+
+.code { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.code code, .muted code { font-weight: 800; letter-spacing: 0.08em; color: var(--gold-soft); }
+
+/* ── Meldungen und Regeln ── */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: min(92vw, 420px);
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--gold);
+  background: var(--stone-2);
+  color: var(--text);
+  font-weight: 700;
+  text-align: center;
+  z-index: 20;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--scrim);
+  z-index: 30;
+}
+
+.sheet {
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: var(--stone);
+}
+
+.sheet h2 { margin: 0; font: 800 1.9rem/1.05 var(--f-display); color: var(--gold-soft); }
+.rules { display: grid; gap: 10px; margin: 0; }
+.rules div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
+.rules dt { font-weight: 800; color: var(--gold-soft); }
+.rules dd { margin: 0; color: var(--text); }
+.sheet .primary { justify-self: end; }
+
+/* ── Handy und schmale Fenster ── */
+
+@media (max-width: 860px) {
+  .bar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; }
+  .bar-actions { grid-row: 1; grid-column: 2; justify-self: end; }
+  .stats { grid-row: 2; grid-column: 1 / -1; gap: 2px 14px; }
+  .stats dt { font-size: 0.66rem; }
+  .stats #s-glut-wrap { display: none !important; }
+  .stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 10px; }
+  .board-wrap { height: min(calc((100vw - 32px) * 0.9167), 56vh); }
+  .brand { font-size: 1.6rem; }
+  .panel { padding: 12px; }
+  .panel h2 { font-size: 1.55rem; }
+  .rules div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+
+  /* Nachts zählt jeder Pixel: Karten in einer Reihe, Beschreibungen stehen in den Regeln */
+  .phase-night { gap: 8px; }
+  .phase-night .eyebrow, .phase-night h2 { display: none; }
+  .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .card { padding: 8px 6px; gap: 4px; }
+  .card strong { font-size: 0.95rem; }
+  .card-text, .card kbd { display: none; }
+  .card-top { justify-content: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- head:start -->
+<title>Hort</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Hort – Prototyp. Du bist der Drache, dein Goldhaufen ist dein Inventar.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&amp;family=Grenze+Gotisch:wght@600;800&amp;display=swap">
+<!-- head:end -->
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<!-- markup:start -->
+<div id="app" lang="de">
+  <header class="bar">
+    <p class="brand">Hort</p>
+    <dl class="stats">
+      <div><dt>Phase</dt><dd id="s-phase">Tag 1</dd></div>
+      <div><dt>Hortwert</dt><dd id="s-value">0</dd></div>
+      <div><dt>Drachenkraft</dt><dd id="s-power">×1,0</dd></div>
+      <div id="s-glut-wrap" hidden><dt>Glut</dt><dd id="s-glut">0/4</dd></div>
+    </dl>
+    <div class="bar-actions">
+      <button id="btn-speed" class="ghost small" type="button" title="Tempo umschalten (F)">1×</button>
+      <button id="btn-pause" class="ghost small" type="button" title="Pause (Leertaste)" disabled>Pause</button>
+      <button id="btn-help" class="ghost small" type="button">Regeln</button>
+    </div>
+  </header>
+  <main class="stage">
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="Die Drachenhöhle: oben der Drache, darunter der Hort, unten der Eingang"></canvas>
+    </div>
+    <aside class="panel" id="panel"></aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="overlay" id="help" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <h2 id="help-title">So spielt sich Hort</h2>
+    <dl class="rules">
+      <div><dt>Ziel</dt><dd>Beschütze dein Ei sechs Nächte lang. Trägt ein Held es aus der Höhle, ist der Run vorbei.</dd></div>
+      <div><dt>Glanz</dt><dd>Helden laufen immer zum glänzendsten Schatz, den sie erreichen und tragen können. Katzengold lenkt sie ab.</dd></div>
+      <div><dt>Gewicht</dt><dd>Diebe und Bauern tragen nur Gewicht 1, Paladine und Zwerge Gewicht 2. Gewicht 3 trägt niemand.</dd></div>
+      <div><dt>Verschmelzen</dt><dd>Zwei gleiche Schätze aufeinander werden zu einem größeren: wertvoller, glänzender, schwerer.</dd></div>
+      <div><dt>Daneben</dt><dd>Viele Schätze wirken auf ihre Nachbarn: direkt links, rechts, oben oder unten.</dd></div>
+      <div><dt>Raubzug</dt><dd>Das Raubziel bestimmt deine Beute und wer nachts kommt. Die Raben verraten dir vorher, wer es ist.</dd></div>
+      <div><dt>Nacht</dt><dd>Deine Klaue trifft Helden bis 2 Felder vor dir. Atem-Karten kosten Glut, die mit der Zeit nachlädt. Solange du zielst, läuft die Zeit langsamer.</dd></div>
+      <div><dt>Drachenkraft</dt><dd>Je mehr dein Hort wert ist, desto mehr Schaden machen Klaue und Atem.</dd></div>
+      <div><dt>Tasten</dt><dd>1–4 Atem-Karten · Leertaste Pause · F Tempo · Esc abbrechen</dd></div>
+    </dl>
+    <button class="primary" type="button" id="btn-help-close">Verstanden</button>
+  </div>
+</div>
+<!-- markup:end -->
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
