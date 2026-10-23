@@ -56,6 +56,8 @@ Startwerte: Ein Run dauert 12 Nächte, in der letzten kommt der Drachentöter al
 | Magierturm | Schriftrollen (neue Atem-Karten) | Magier (teleportieren einen Schatz weg) |
 | Handelskarawane | viel Gold auf einmal | Söldner (viele, schwach) |
 
+Die Raubziele gehören zu **Nachbarreichen**. In jedem Run sind drei davon dabei (siehe „Jeder Run anders“).
+
 ### 4. Die Raben berichten
 
 - **Regel:** Vor jeder Nacht zeigen dir deine Raben die Heldengruppe mit allen Tricks.
@@ -105,12 +107,104 @@ Nachts schnappt sich der Dieb das Katzengold und rennt. Du lässt ihn laufen, es
 
 9 Kings (in Deutschland von INSTINCT3 vermarktet) und Cards & Cannons (Sidekick Publishing) kommen beide aus HoBs Umfeld. Hort muss sich deshalb klar abheben: Wir übernehmen Prinzipien, keine Systeme.
 
-## Später (nicht in der ersten Demo)
+## Langlebigkeit und Meta-Progression
 
-- **Drachenarten** mit eigenem Start-Hort und eigener Regel, z. B. Golddrache (verschmilzt günstiger), Kristalldrache (Edelsteine leiten Effekte weiter), Knochendrache (gefallene Helden stehen als Wächter wieder auf). Freigeschaltet durch ausgebrütete Eier.
+Grundsatz: **Langlebig durch Vielfalt und Können, nicht durch Grind.** Meta-Progression schaltet neue Möglichkeiten frei, aber keine dauerhaften Werte-Boni. Einen Run gewinnt man, weil man besser spielt, nicht weil man länger gespielt hat.
+
+Und: Meta-Progression verlängert nur ein Spiel, dessen Kern schon trägt. Erst wenn eine einzelne Nacht Spaß macht, bauen wir die Systeme drumherum.
+
+### Fünf Gründe für noch einen Run
+
+| Frage nach dem Run | Antwort im Spiel |
+|---|---|
+| Was ist neu? | Brutkammer und Drachenalter |
+| Geht es noch schwerer? | Legende |
+| Was habe ich noch nicht entdeckt? | Hortbuch, Taten und geheime Eier |
+| Wer hat noch eine Rechnung offen? | Erzfeinde |
+| Wie schneide ich gegen andere ab? | Endlose Belagerung, Wochen-Hort, Hort-Codes |
+
+### Jeder Run anders: drei Nachbarreiche
+
+- Dein Revier grenzt in jedem Run an drei zufällige Reiche, z. B. Bauernland, Klosterorden, Zwergenclan, Magierzirkel, Händlerbund. Nur deren Raubziele, Helden und Beute kommen in diesem Run vor.
+- **Vorbild:** In 9 Kings sind in jedem Run drei zufällige Könige deine Feinde.
+- Mit 6 Reichen gibt es 20 Kombinationen, mit 4 Drachenarten 80 verschiedene Starts. Jedes neue Reich per Update erhöht das deutlich.
+
+### Brutkammer: Was du ausbrütest, hängt davon ab, worauf du brütest
+
+- Gewinnst du, schlüpft das Ei. Welche Drachenart schlüpft, entscheidet der Inhalt deines Horts in der letzten Nacht.
+- Schlüpft eine Art, die du schon hast, bekommt sie eine neue Farbvariante.
+- Jede Art hat einen eigenen Start-Hort und eine eigene Regel:
+
+| Drachenart | Wie man sie ausbrütet | Eigene Regel |
+|---|---|---|
+| Golddrache | Startdrache | Keine Sonderregel – der Grunddrache, wie der King of Nothing in 9 Kings |
+| Kristalldrache | Hort überwiegend aus Edelsteinen | Edelsteine leiten Nachbar-Effekte in gerader Linie weiter |
+| Knochendrache | Viel Beute besiegter Helden im Hort | Gefallene Helden stehen in der nächsten Nacht als Wächter wieder auf |
+| Mondsilberdrache (geheim) | Besondere Mischung, die Raben streuen Hinweise | Glanz wirkt umgekehrt: Helden laufen zum *am wenigsten* glänzenden Schatz |
+
+### Drachenalter: Fortschritt in jedem Run
+
+- Jede Drachenart hat eine Fortschrittsleiste. Jeder Run füllt sie, auch ein verlorener (überstandene Nächte, besiegte Helden).
+- Jede Stufe legt neue Schätze, Atem-Karten oder Raubziele in den Pool dieser Art. Etwa 10 Stufen pro Art, dann ist sie ausgewachsen.
+- Mehr Auswahl, nicht mehr Stärke.
+
+### Legende: Je berühmter dein Drache, desto bessere Helden kommen
+
+- Nach einem Sieg steigt die Legende dieser Drachenart um eine Stufe, bis Stufe 20. Jede Stufe fügt eine Regel hinzu.
+- Beispiele: Diebe sind schneller · die Raben verraten nur noch zwei von drei Helden · Glut lädt langsamer · Katzengold wird manchmal durchschaut · der Drachentöter bekommt eine zweite Phase.
+- Belohnung ist Ruhm statt Macht: Narben, Hörner und Farben am Drachen zeigen, wie weit man gekommen ist.
+
+### Erzfeinde: Wer entkommt, kommt wieder
+
+- Ein Dieb, der mit deinem Schatz entkommt, bekommt einen Namen und taucht in späteren Runs wieder auf – mit deinem Schatz und stärker als vorher.
+- Besiegst du ihn, holst du den Schatz zurück und hängst seinen Helm an die Trophäenwand.
+- Höchstens drei Erzfeinde gleichzeitig, damit es überschaubar bleibt.
+- Mit Twitch-Anbindung trägt der Erzfeind den Namen des Zuschauers, dessen Held entkommen ist. So jagt ein Streamer einen bestimmten Zuschauer über viele Streams hinweg.
+
+### Hortbuch und Taten: Entdecken statt Abarbeiten
+
+- Das Hortbuch sammelt alles, was du gesehen hast: Schätze, Helden, Verschmelzungen, geheime Kombinationen. Unentdeckte Einträge zeigen nur einen Umriss und einen Hinweis.
+- Taten sind kleine Aufgaben, die besondere Schätze freischalten und gleichzeitig Steam-Erfolge sind. So lernt man nebenbei die Kniffe kennen. Beispiele:
+  - Lass in einer Nacht drei Diebe mit Katzengold entkommen → Narrenkrone
+  - Gewinne eine Nacht, ohne eine Atem-Karte zu spielen → Schlafender Wächter
+  - Verschmelze einen Schatz bis zum Wahrzeichen → Drachenschmiede (neue Atem-Karte)
+
+### Modi nach dem ersten Sieg
+
+- **Endlose Belagerung:** Wie viele Nächte hält dein Hort? Mit Steam-Bestenliste.
+- **Wochen-Hort:** Eine Woche lang spielen alle denselben Run. Bestenliste, aber keine exklusiven Belohnungen: Wer eine Woche verpasst, verpasst nichts.
+- **Hort-Codes:** Einen Run als Code teilen, damit andere ihn nachspielen können. Ideal für Streams und Communities.
+
+Technik: Wochen-Hort und Bestenlisten gehen ohne eigenen Server. Der Run wird aus der Kalenderwoche erzeugt, die Bestenliste läuft über Steam. Den Twitch-Chat kann das Spiel ebenfalls ohne eigenen Server mitlesen.
+
+### Die Höhle zwischen den Runs
+
+Zwischen den Runs ist die Höhle dein Trophäenraum: das Nest mit allen geschlüpften Drachen, die Trophäenwand mit den Helmen besiegter Erzfeinde, das Hortbuch. Fortschritt, den man sieht, ohne dass er das Spiel leichter macht.
+
+### Was das Spiel langlebig hält
+
+- **Early Access mit öffentlicher Roadmap:** Alle 6–8 Wochen ein kostenloses Inhalts-Update mit einem neuen Nachbarreich (Raubziel, Heldenfraktion, Beutefamilie) oder einer neuen Drachenart. 9 Kings ist mit 7 von 9 Königen gestartet und hat die restlichen im Early Access nachgeliefert.
+- **Inhalte als Daten:** Alle Schätze, Helden und Karten stehen in Datendateien statt im Code. Das macht Updates schneller und erlaubt später Mods über den Steam Workshop.
+- **Balance-Bot:** Ein Autopilot spielt tausende Runs und meldet, welche Schätze zu stark oder nutzlos sind – wie der Autopilot im Sim-Racing-Projekt und die Simulation in Runenfall.
+- **Große Meilensteine:** Early-Access-Start, 1.0, später Koop. Jeder ist ein Anlass für Streams, Presse und neue Aufmerksamkeit auf Steam.
+
+### Was wir bewusst weglassen
+
+Battle Pass, Lootboxen, Saison-Pass, tägliche Aufgaben mit Ablaufdatum, Belohnungen nur für einen bestimmten Zeitraum, bezahlte Abkürzungen, Online-Zwang und dauerhafte Werte-Boni. Von genau diesen Dingen sind Spieler 2026 müde, und 9 Kings wird für zähen Grind kritisiert.
+
+### Ausbaustufen
+
+| Stufe | Inhalt |
+|---|---|
+| Demo (Next Fest Juni 2027, gamescom) | 1 Drache, Hortbuch in einfacher Form, erste Taten |
+| Early-Access-Start | 3 Drachenarten + 1 geheime, Drachenalter, Legende 1–10, Erzfeinde, Endlose Belagerung |
+| Updates im Early Access | Neue Nachbarreiche und Drachenarten, Legende bis 20, Wochen-Hort, Hort-Codes, Twitch-Helden, Flüche, wachsende Höhle |
+| 1.0 und danach | Steam Workshop, Koop |
+
+## Weitere Ideen für Updates
+
 - **Flüche:** Verfluchte Schätze sind stark, haben aber einen Haken (z. B. doppelter Glanz für die Nachbarn). Passt zum Mythos vom verfluchten Nibelungenhort.
 - **Die Höhle wächst:** Ab bestimmten Hort-Werten wird das Raster größer.
-- **Zuschauer-Helden:** Twitch-Zuschauer melden sich per Chat an und tragen ihren Namen über einem Helden.
 - **Koop:** zwei Drachen, ein Hort – und jeder klaut beim anderen.
 
 ## Umfang der ersten Demo (Vorschlag)
@@ -124,9 +218,12 @@ Nachts schnappt sich der Dieb das Katzengold und rennt. Du lässt ihn laufen, es
 1. **Nachtkampf:** Automatisch mit Atem-Karten (Vorschlag) oder den Drachen direkt steuern?
 2. **Setting:** Eigene Fantasy-Welt oder deutsche Sagenwelt (Nibelungen, Fafnir)?
 3. **Grafikstil:** Muss ohne KI-Bilder auskommen und auch auf schwachen PCs laufen.
+4. **Meta-Progression:** Nur Freischaltungen (Vorschlag) oder zusätzlich kleine dauerhafte Boni wie in Runenfall?
 
 ## Referenzen
 
 - 9 Kings: [Early-Access-Test](https://www.elliotcsmith.com/9-kings-early-access-review/), [Spieler-Kritik (Zusammenfassung)](https://vaporlens.app/app/2784470/9_kings), [Steam Deck](https://steamdeckhq.com/game-reviews/9-kings/), [Anspielbericht Mein-MMO](https://mein-mmo.de/9-kings-steam-anspielbericht/)
 - Cards & Cannons: [Steam](https://store.steampowered.com/app/4536920/Cards__Cannons/), [Deutscher Computerspielpreis](https://deutscher-computerspielpreis.de/chronik/cards-and-cannons/?lang=en), [GamesMarket](https://www.gamesmarket.global/flamehead-games-fresh-take-on-the-classic-tower-defence-formula/)
 - Hoard (2011): [Steam](https://store.steampowered.com/app/63000)
+- 9 Kings im Early Access: [Start mit 7 von 9 Königen](https://www.gamedeveloper.com/press-release/roguelite-kingdom-builder-9-kings-is-out-now-in-early-access), [neunter König per Update](https://www.pcgamesn.com/9-kings/update-king-of-time), [weitere Pläne](https://turnbasedlovers.com/news/strategy-roguelite-9-kings-gets-a-new-time-traveling-ruler/)
+- Live-Service-Müdigkeit: [Club386](https://www.club386.com/why-live-service-fatigue-growing-gamers/)
