@@ -1,6 +1,6 @@
 # Von hier zu Steam
 
-> Stand: 23.10.2026. Ziel: Steam-Seite Anfang 2027, Demo zum Next Fest im Juni 2027, gamescom im August 2027.
+> Stand: 26.10.2026. Ziel: Steam-Seite Anfang 2027, Demo zum Next Fest im Juni 2027, gamescom im August 2027.
 
 ## Was schon fertig ist
 

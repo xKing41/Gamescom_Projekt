@@ -21,7 +21,15 @@ HARP.push(86);
 const BASS = [38, 38, 41, 36]; // D D F C – ein langsamer Wechsel unter der Harfe
 
 // Wie lange dasselbe Geräusch mindestens Pause macht: acht Treffer im selben Augenblick klingen wie einer
-const GAP = { claw: 0.07, death: 0.06, grab: 0.1, snare: 0.1, place: 0.04, click: 0.03, drop: 0.12, fireproof: 0.2, cast: 0.25, stolen: 0.15 };
+const GAP = { claw: 0.07, death: 0.06, grab: 0.1, snare: 0.1, place: 0.04, click: 0.03, drop: 0.12, fireproof: 0.2, cast: 0.25, stolen: 0.15, spear: 0.05, stone: 0.09, pulse: 0.16, curse: 0.1, bolt: 0.1, spike: 0.06, coin: 0.07, levelup: 0.25, build: 0.1, rockfall: 0.2, oilfire: 0.3 };
+
+// Welches Geräusch zu welchem Ereignis der Spiellogik gehört
+const CUE = {
+  shot: (e) => (e.id === 'stein' ? 'stone' : e.id === 'fluch' ? 'curse' : 'spear'),
+  breath: 'fire', pulse: 'pulse', bolt: 'bolt', spike: 'spike', rockfall: 'rockfall', coin: 'coin', levelup: 'levelup', build: 'build',
+  sell: 'drop', learn: 'learn', socket: 'socket', balmung: 'balmung', windup: 'windup', oilfire: 'oilfire', claw: 'claw', wing: 'wing',
+  roar: 'roar', grab: 'grab', death: 'death', snare: 'snare', mimik: 'mimik', teleport: 'teleport', dig: 'dig', loot: 'loot',
+};
 
 export function loadAudioSettings() {
   try {
@@ -395,6 +403,84 @@ export function createSynth(ctx) {
       coins(sfxVoice({ pan: e.pan, wet: 0.2 }), t, 4, 0.2);
     },
 
+    // Türme und Fallen der Kobolde
+    spear(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.1 });
+      const k = rnd(0.92, 1.08);
+      tone(v, t, { type: 'triangle', f: 196 * k, f2: 150 * k, decay: 0.12, gain: 0.32 });
+      noise(v, t, { decay: 0.09, gain: 0.45, band: { type: 'bandpass', f: 2600 * k, f2: 900, q: 1.4 } });
+    },
+    stone(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.18 });
+      tone(v, t, { f: 120, f2: 60, decay: 0.16, gain: 0.5 });
+      noise(v, t, { decay: 0.08, gain: 0.5, band: { type: 'bandpass', f: 700, q: 1.1 } });
+      noise(v, t + 0.22, { decay: 0.14, gain: 0.55, band: { type: 'lowpass', f: 900, f2: 200 } });
+    },
+    pulse(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.2 });
+      noise(v, t, { attack: 0.03, decay: 0.3, gain: 0.32, band: { type: 'lowpass', f: 500, f2: 1600, q: 0.8 } });
+      crackle(v, t + 0.05, 0.3, 3, 0.12);
+    },
+    curse(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.45 });
+      tone(v, t, { f: 330, f2: 247, attack: 0.02, decay: 0.32, gain: 0.12, detune: 12 });
+      tone(v, t, { f: 333, f2: 250, attack: 0.02, decay: 0.32, gain: 0.12, detune: -12 });
+      bell(v, t + 0.03, midi(81), 0.04, 0.6);
+    },
+    bolt(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.2 });
+      noise(v, t, { decay: 0.12, gain: 0.5, band: { type: 'highpass', f: 2600 } });
+      tone(v, t, { type: 'square', f: 880, f2: 220, decay: 0.12, gain: 0.12, lp: 3000 });
+    },
+    spike(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.12 });
+      noise(v, t, { decay: 0.05, gain: 0.55, band: { type: 'highpass', f: 2200 } });
+      tone(v, t, { type: 'triangle', f: 1660, decay: 0.12, gain: 0.14 });
+    },
+    rockfall(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.3 });
+      noise(v, t, { attack: 0.02, decay: 0.5, gain: 0.55, band: { type: 'lowpass', f: 400, f2: 120 } });
+      for (let i = 0; i < 6; i++) noise(v, t + Math.random() * 0.4, { decay: rnd(0.04, 0.09), gain: rnd(0.3, 0.5), band: { type: 'bandpass', f: rnd(500, 1300), q: 1.6 } });
+    },
+    oilfire(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.25 });
+      noise(v, t, { attack: 0.06, hold: 0.15, decay: 0.5, gain: 0.45, band: { type: 'lowpass', f: 400, f2: 2200, q: 0.8 } });
+      crackle(v, t + 0.1, 0.6, 6, 0.14);
+    },
+    coin(t, e) {
+      coins(sfxVoice({ pan: e.pan, wet: 0.15 }), t, 1, 0.12);
+    },
+    levelup(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.4 });
+      [0, 4, 7].forEach((step, i) => bell(v, t + i * 0.07, midi(79 + step), 0.09, 0.9));
+    },
+    learn(t, e) {
+      bell(sfxVoice({ pan: e.pan, wet: 0.4 }), t, midi(86), 0.1, 1);
+    },
+    socket(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.3 });
+      tone(v, t, { type: 'triangle', f: 1046, decay: 0.08, gain: 0.25 });
+      bell(v, t + 0.06, midi(84), 0.08, 0.8);
+    },
+    build(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.15 });
+      for (const dt of [0, 0.13, 0.26]) {
+        tone(v, t + dt, { type: 'triangle', f: rnd(330, 400), f2: 200, decay: 0.06, gain: 0.3 });
+        noise(v, t + dt, { decay: 0.03, gain: 0.35, band: { type: 'bandpass', f: 1200, q: 1.5 } });
+      }
+    },
+    windup(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.3 });
+      noise(v, t, { attack: 0.6, decay: 0.2, gain: 0.32, band: { type: 'bandpass', f: 400, f2: 2400, q: 1.2 } });
+      tone(v, t, { type: 'sawtooth', f: 110, f2: 220, attack: 0.6, decay: 0.2, gain: 0.07, lp: 900 });
+    },
+    balmung(t, e) {
+      const v = sfxVoice({ pan: e.pan, wet: 0.35 });
+      bell(v, t, midi(64), 0.16, 0.9);
+      noise(v, t, { decay: 0.2, gain: 0.6, band: { type: 'highpass', f: 1800 } });
+      tone(v, t, { f: 90, f2: 45, decay: 0.3, gain: 0.45 });
+    },
+
     // Übergänge zwischen den Phasen
     nightfall(t) {
       // Ein Kriegshorn der Helden, weit weg
@@ -633,9 +719,10 @@ export function createAudio() {
   function effects(list) {
     if (!running() || !list.length) return;
     for (const e of list) {
-      const x = e.x ?? (e.c != null ? e.c + 0.5 : null);
-      const name = e.cue ?? e.type;
-      if (name === 'text' || name === 'dmg') continue;
+      const x = e.x ?? e.x0 ?? (e.c != null ? e.c + 0.5 : null);
+      const cue = CUE[e.type];
+      const name = e.cue ?? (typeof cue === 'function' ? cue(e) : cue);
+      if (!name) continue;
       play(name, { ...e, pan: panOf(x) });
     }
   }
@@ -659,8 +746,7 @@ export function createAudio() {
     else if (from === 'night' && to === 'morning') play('dawn');
     else if (to === 'won') play('hatch');
     else if (to === 'lost') play('defeat');
-    else if (from === 'raid' && to === 'loot') play('raid');
-    else if (from === 'loot' && to === 'arrange') play('loot');
+
   }
 
   function measureThreat(state) {

@@ -1,14 +1,14 @@
-// Controller über die Gamepad-API: Steuerkreuz und linker Stick bewegen einen Rahmen über den Hort,
+// Controller über die Gamepad-API: Steuerkreuz und linker Stick bewegen einen Rahmen über die Höhle,
 // einen Zielpunkt in der Nacht oder den Fokus durch die Tafel. Die Tasten sind wie bei Konsolenspielen belegt.
 // Läuft mit Xbox- und PlayStation-Controllern und dem Steam Deck (Steam Input meldet sich als Xbox-Controller).
 
 import * as Sim from './sim.js';
-import { CARD_BY_ID } from './data.js';
-import { HOARD_CELLS, COLS, ROWS, MAP } from './map.js';
+import { DRAGON } from './data.js';
+import { COLS, ROWS } from './map.js';
 
 // Standard-Belegung der Gamepad-API
 const BUTTONS = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, back: 8, start: 9, up: 12, down: 13, left: 14, right: 15 };
-export const CARD_BUTTONS = ['lb', 'rb', 'lt', 'rt'];
+export const ABILITY_BUTTONS = ['lb', 'rb', 'lt'];
 const LABELS = {
   xbox: { a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', lt: 'LT', rt: 'RT', back: 'View', start: 'Menü' },
   ps: { a: '✕', b: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', lt: 'L2', rt: 'R2', back: 'Create', start: 'Options' },
@@ -18,12 +18,6 @@ const REPEAT_DELAY = 0.3;
 const REPEAT_RATE = 0.11;
 const AIM_SPEED = 9; // Felder pro Sekunde bei voll gedrücktem Stick
 
-const BOX = {
-  c0: Math.min(...HOARD_CELLS.map((h) => h.c)),
-  c1: Math.max(...HOARD_CELLS.map((h) => h.c)),
-  r0: Math.min(...HOARD_CELLS.map((h) => h.r)),
-  r1: Math.max(...HOARD_CELLS.map((h) => h.r)),
-};
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // In einem fremden Rahmen ohne Controller-Erlaubnis wirft getGamepads einen Fehler (z. B. Firefox) –
@@ -47,9 +41,13 @@ export function createPad(app, { ui, renderer, actions }) {
   let dir = null;
   let repeat = 0;
   let focusKey = null;
+  let mapMode = false; // in der Bauphase: Rahmen über der Höhle statt Fokus in der Tafel
 
-  const night = () => app.mode === 'run' && app.state?.phase === 'night';
   const phase = () => (app.mode === 'hub' ? 'hub' : app.state?.phase);
+  const night = () => app.mode === 'run' && phase() === 'night';
+  const building = () => app.mode === 'run' && view.selected != null && phase() !== 'night';
+  const onMap = () => app.mode === 'run' && phase() === 'build' && !building() && (mapMode || view.card != null);
+  const aiming = () => night() && view.ability === 'feuer';
   const openOverlay = () => [...document.querySelectorAll('.overlay')].find((el) => !el.hidden) ?? null;
 
   // Xbox zuerst prüfen: Der Xbox-Controller heißt auch „Wireless Controller“
@@ -84,8 +82,9 @@ export function createPad(app, { ui, renderer, actions }) {
 
   function startCell() {
     const s = app.state;
-    const egg = s ? HOARD_CELLS.find(({ c, r }) => Sim.itemAt(s, c, r)?.id === 'ei') : null;
-    return { x: (egg?.c ?? BOX.c0) + 0.5, y: (egg?.r ?? BOX.r0) + 0.5 };
+    if (!s?.chamber) return { x: COLS / 2, y: ROWS / 2 };
+    const c = Sim.chamberCenter(s);
+    return { x: c.c + 0.5, y: c.r - 1.5 };
   }
 
   const cursorCell = () => ({ c: Math.floor(view.cursor.x), r: Math.floor(view.cursor.y) });
@@ -93,18 +92,11 @@ export function createPad(app, { ui, renderer, actions }) {
   // Der Rahmen oder Zielpunkt erscheint dort, wo sonst die Maus wäre
   function syncPointer() {
     if (view.input !== 'pad' || !view.cursor) return;
-    const p = phase();
-    if (p === 'arrange') {
-      // Am Tag rastet der Rahmen auf den Hortfeldern ein
-      const { c, r } = cursorCell();
-      view.cursor = { x: clamp(c, BOX.c0, BOX.c1) + 0.5, y: clamp(r, BOX.r0, BOX.r1) + 0.5 };
-    }
-    if (p === 'arrange' || (p === 'night' && view.card && CARD_BY_ID[view.card].target === 'tile')) {
-      const cell = cursorCell();
-      view.hover = cell;
-      const rect = renderer.cellCenter(0, 0);
+    if (onMap() || aiming()) {
+      view.hover = cursorCell();
+      const origin = renderer.cellCenter(0, 0);
       const t = renderer.tileSize();
-      view.pointer = { x: rect.x + (view.cursor.x - 0.5) * t, y: rect.y + (view.cursor.y - 0.5) * t };
+      view.pointer = { x: origin.x + (view.cursor.x - 0.5) * t, y: origin.y + (view.cursor.y - 0.5) * t };
     } else {
       view.hover = null;
       view.pointer = null;
@@ -115,7 +107,7 @@ export function createPad(app, { ui, renderer, actions }) {
 
   const visible = (el) => el.offsetParent !== null || el.getClientRects().length > 0;
   const focusables = (root) => [...root.querySelectorAll(FOCUSABLE)].filter(visible);
-  const keyOf = (el) => (el?.dataset?.action ? `${el.dataset.action}|${el.dataset.id ?? ''}|${el.dataset.i ?? ''}` : el?.id ? `#${el.id}` : null);
+  const keyOf = (el) => (el?.dataset?.action ? `${el.dataset.action}|${el.dataset.id ?? ''}|${el.dataset.i ?? ''}|${el.dataset.dir ?? ''}` : el?.id ? `#${el.id}` : null);
 
   function focus(el) {
     if (!el) return;
@@ -179,111 +171,33 @@ export function createPad(app, { ui, renderer, actions }) {
   // Nach jedem Neuzeichnen der Tafel den Fokus wiederfinden
   function afterRender() {
     if (view.input !== 'pad' || openOverlay()) return;
-    const p = phase();
-    if (p === 'arrange' || p === 'night') return;
+    if (night() || onMap()) return;
     const items = focusables(panel);
     const again = focusKey && items.find((el) => keyOf(el) === focusKey);
-    focus(again ?? items.find((el) => el.classList.contains('primary') && !el.disabled) ?? items[0]);
+    const node = building() ? items.find((el) => el.dataset.action === 'node' && el.classList.contains('is-sel')) : null;
+    focus(again ?? node ?? items.find((el) => el.classList.contains('primary') && !el.disabled) ?? items[0]);
   }
 
-  // ── Hort ordnen ──
+  // ── Höhle: Rahmen beim Bauen, Zielen in der Nacht ──
 
   function moveCursor(dx, dy) {
     const { c, r } = cursorCell();
-    view.cursor = { x: clamp(c + dx, BOX.c0, BOX.c1) + 0.5, y: clamp(r + dy, BOX.r0, BOX.r1) + 0.5 };
+    view.cursor = { x: clamp(c + dx, 0, COLS - 1) + 0.5, y: clamp(r + dy, 1, ROWS - 1) + 0.5 };
     syncPointer();
     ui.showInfo();
   }
 
-  function cycleTray(step) {
+  function cycleCard(step) {
     const s = app.state;
-    if (!s.tray.length) return;
-    const cur = view.held?.where === 'tray' ? view.held.i : step > 0 ? -1 : 0;
-    const i = (cur + step + s.tray.length) % s.tray.length;
-    actions.pickTray(i);
-  }
-
-  // ── Nacht ──
-
-  function urgency(h) {
-    if (h.carry?.id === 'ei') return 0;
-    if (h.carry) return 1;
-    if (h.state === 'grab' || h.state === 'cast') return 2;
-    return 3;
-  }
-
-  function targets() {
-    const s = app.state;
-    const card = CARD_BY_ID[view.card];
-    return Sim.activeHeroes(s)
-      .filter((h) => !card.range || Sim.distToDragon(h.x, h.y) <= card.range)
-      .sort((a, b) => urgency(a) - urgency(b) || Sim.distToDragon(a.x, a.y) - Sim.distToDragon(b.x, b.y));
-  }
-
-  function startAim() {
-    const card = CARD_BY_ID[view.card];
-    if (!card) return;
-    if (card.target === 'hero') {
-      view.aimUid = targets()[0]?.uid ?? null;
-      return;
-    }
-    // Feld-Karten zielen zuerst auf den gefährlichsten Helden
-    const s = app.state;
-    const foe = Sim.activeHeroes(s).sort((a, b) => urgency(a) - urgency(b))[0];
-    view.cursor = foe ? { x: foe.x, y: foe.y } : view.cursor ?? startCell();
-    syncPointer();
-  }
-
-  function cycleHero(dx, dy) {
-    const list = targets();
-    if (!list.length) {
-      view.aimUid = null;
-      return;
-    }
-    const cur = list.find((h) => h.uid === view.aimUid);
-    if (!cur) {
-      view.aimUid = list[0].uid;
-      return;
-    }
-    // Den nächsten Helden in der gedrückten Richtung wählen
-    let best = null;
-    let bestScore = Infinity;
-    for (const h of list) {
-      if (h === cur) continue;
-      const along = (h.x - cur.x) * dx + (h.y - cur.y) * dy;
-      if (along <= 0.05) continue;
-      const across = Math.abs((h.x - cur.x) * dy) + Math.abs((h.y - cur.y) * dx);
-      const score = along + across * 1.5;
-      if (score < bestScore) {
-        bestScore = score;
-        best = h;
-      }
-    }
-    if (best) view.aimUid = best.uid;
-  }
-
-  function stepAim(dx, dy) {
-    const { c, r } = cursorCell();
-    view.cursor = { x: clamp(c + dx, 0, COLS - 1) + 0.5, y: clamp(r + dy, 0, ROWS - 1) + 0.5 };
-    syncPointer();
-  }
-
-  function cast() {
-    const card = CARD_BY_ID[view.card];
-    if (!card) return;
-    if (card.target === 'hero') {
-      if (view.aimUid == null) {
-        actions.fail('Kein Held in Reichweite.');
-        return;
-      }
-      actions.cast({ uid: view.aimUid });
-    } else {
-      const cell = cursorCell();
-      if (MAP[cell.r]?.[cell.c] === '#') {
-        actions.fail('Dort ist Fels.');
-        return;
-      }
-      actions.cast(cell);
+    const n = s.deck.hand.length;
+    if (!n) return;
+    const cur = view.card ?? (step > 0 ? -1 : 0);
+    const i = (cur + step + n) % n;
+    if (view.card !== i) app.act('card', { i });
+    if (view.card != null) {
+      mapMode = true;
+      if (!view.cursor) view.cursor = startCell();
+      syncPointer();
     }
   }
 
@@ -295,13 +209,8 @@ export function createPad(app, { ui, renderer, actions }) {
       moveFocus(overlay, dx, dy);
       return;
     }
-    const p = phase();
-    if (p === 'arrange') moveCursor(dx, dy);
-    else if (p === 'night') {
-      const card = view.card && CARD_BY_ID[view.card];
-      if (card?.target === 'hero') cycleHero(dx, dy);
-      else if (card?.target === 'tile') stepAim(dx, dy);
-    } else moveFocus(panel, dx, dy);
+    if (aiming() || onMap()) moveCursor(dx, dy);
+    else if (!night()) moveFocus(panel, dx, dy);
   }
 
   function onButton(b) {
@@ -322,29 +231,57 @@ export function createPad(app, { ui, renderer, actions }) {
       else actions.openSettings();
       return;
     }
-    if (p === 'arrange') {
-      if (b === 'a') actions.tapCell(cursorCell());
-      else if (b === 'b') actions.cancel();
-      else if (b === 'x') app.act('discard');
-      else if (b === 'lb' || b === 'rb') cycleTray(b === 'rb' ? 1 : -1);
-      else if (b === 'y') clickPrimary();
-      return;
-    }
-    if (p === 'night') {
-      const i = CARD_BUTTONS.indexOf(b);
-      const cards = app.state.opts.cards;
-      if (i >= 0) {
-        if (i < cards.length) {
-          actions.selectCard(cards[i]);
-          startAim();
+    if (night()) {
+      const i = ABILITY_BUTTONS.indexOf(b);
+      if (i >= 0 && i < DRAGON.abilities.length) {
+        actions.selectAbility(DRAGON.abilities[i].id);
+        if (aiming()) {
+          const s = app.state;
+          // Zuerst auf den gefährlichsten Helden zielen
+          const foe = Sim.activeHeroes(s).sort((x, y) => (y.carry ? 1 : 0) - (x.carry ? 1 : 0))[0];
+          view.cursor = foe ? { x: foe.x, y: foe.y } : view.cursor ?? startCell();
+          syncPointer();
         }
-      } else if (b === 'a') cast();
+      } else if (b === 'a' && aiming()) actions.cast(cursorCell());
       else if (b === 'b') actions.cancel();
       else if (b === 'y') app.act('speed');
       return;
     }
+    if (building()) {
+      if (b === 'b') app.act('deselect');
+      else if (b === 'a') click(panel);
+      else if (b === 'y') clickPrimary();
+      return;
+    }
+    if (p === 'build') {
+      if (b === 'lb' || b === 'rb') {
+        cycleCard(b === 'rb' ? 1 : -1);
+        return;
+      }
+      if (b === 'x') {
+        // Rahmen über die Höhle, um einen Turm zu wählen; B kehrt in die Tafel zurück
+        mapMode = true;
+        if (!view.cursor) view.cursor = startCell();
+        syncPointer();
+        ui.render();
+        return;
+      }
+      if (onMap()) {
+        if (b === 'a') {
+          actions.tapCell(cursorCell());
+          if (view.card == null && view.selected == null) syncPointer();
+          if (view.selected != null) mapMode = false;
+        } else if (b === 'b') {
+          mapMode = false;
+          actions.cancel();
+          ui.render();
+        } else if (b === 'y') clickPrimary();
+        return;
+      }
+    }
     if (b === 'a') click(panel);
     else if (b === 'y') clickPrimary();
+    else if (b === 'b' && view.card != null) actions.cancel();
   }
 
   // ── Abfrage, einmal pro Bild ──
@@ -364,6 +301,7 @@ export function createPad(app, { ui, renderer, actions }) {
   }
 
   function poll(dt) {
+    if (phase() !== 'build' || building()) mapMode = false;
     const gp = read();
     if (!gp) return;
     if (gp.index !== index) {
@@ -379,7 +317,7 @@ export function createPad(app, { ui, renderer, actions }) {
     const ay = gp.axes[1] ?? 0;
     const stick = Math.hypot(ax, ay) > DEAD;
     const any = Object.values(down).some(Boolean) || stick;
-    const freeAim = night() && view.card && CARD_BY_ID[view.card].target === 'tile' && !openOverlay();
+    const freeAim = aiming() && !openOverlay();
 
     // Richtungen: Steuerkreuz, sonst Stick – mit Wiederholung beim Festhalten
     let d = null;
@@ -401,13 +339,13 @@ export function createPad(app, { ui, renderer, actions }) {
       return;
     }
 
-    // Freies Zielen mit dem Stick, solange eine Feld-Karte gewählt ist
+    // Freies Zielen mit dem Stick beim Feueratem
     if (freeAim && stick) {
       const k = Math.min(1, (Math.hypot(ax, ay) - DEAD * 0.6) / (1 - DEAD * 0.6));
       const len = Math.hypot(ax, ay);
       view.cursor = {
         x: clamp(view.cursor.x + (ax / len) * k * k * AIM_SPEED * dt, 0.5, COLS - 0.5),
-        y: clamp(view.cursor.y + (ay / len) * k * k * AIM_SPEED * dt, 0.5, ROWS - 0.5),
+        y: clamp(view.cursor.y + (ay / len) * k * k * AIM_SPEED * dt, 1.5, ROWS - 0.5),
       };
       syncPointer();
     }
@@ -428,17 +366,11 @@ export function createPad(app, { ui, renderer, actions }) {
       if (down[name] && !prev[name]) onButton(name);
     }
     Object.assign(prev, down);
-
-    // Ein Held als Ziel bleibt markiert, bis er fällt oder flieht
-    if (night() && view.card && CARD_BY_ID[view.card].target === 'hero') {
-      const list = targets();
-      if (!list.some((h) => h.uid === view.aimUid)) view.aimUid = list[0]?.uid ?? null;
-    } else view.aimUid = null;
     syncPointer();
   }
 
   // Rütteln bei großen Momenten – nur wenn mit Controller gespielt wird
-  const RUMBLE = { roar: [380, 0.7, 0.4], tail: [160, 0.45, 0.3], wing: [140, 0.2, 0.35], fire: [220, 0.25, 0.4], rain: [500, 0.15, 0.3], snare: [90, 0.3, 0.2] };
+  const RUMBLE = { roar: [380, 0.7, 0.4], wing: [160, 0.3, 0.35], breath: [240, 0.3, 0.4], balmung: [200, 0.6, 0.3], dig: [260, 0.4, 0.2], snare: [90, 0.3, 0.2] };
   function effects(list) {
     if (view.input !== 'pad' || index == null || !list.length) return;
     const gp = gamepads()[index];
@@ -464,6 +396,9 @@ export function createPad(app, { ui, renderer, actions }) {
     },
     get connected() {
       return index != null && !!gamepads()[index]?.connected;
+    },
+    get mapMode() {
+      return onMap();
     },
   };
 }

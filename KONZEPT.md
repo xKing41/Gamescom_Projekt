@@ -1,235 +1,153 @@
 # HORT – Konzept
 
-> Arbeitstitel. Stand: 23.10.2026 – der Prototyp (v0.3) setzt die Kniffe und die Meta-Progression bis zum Early-Access-Umfang um und läuft mit Ton, Controller und als Desktop-Fassung; was noch fehlt, steht unter „Ausbaustufen“.
+> Arbeitstitel. Stand: 26.10.2026 – der Prototyp v0.4 setzt den neuen Kern um: die wachsende Höhle, Koboldtürme mit eigenem Baum, Leben/Rüstung/Segen, den Drachen als aktiven Mitspieler und Siegfried als Boss. Grafik, Ton, Controller, Desktop-Fassung, Hortbuch und Erzfeinde sind aus v0.3 mitgekommen.
 > Ziel: Steam-Demo zum Next Fest im Juni 2027, Stand auf der gamescom im August 2027.
 
 ## In einem Satz
 
-Du bist der Drache am Ende des Dungeons und beschützt dein Ei. Dein Goldhaufen ist dein Inventar: Wie du die Schätze anordnest, bestimmt deine Kräfte – und jeder Held, der etwas klaut, reißt ein Stück aus deinem Build.
+Du bist der Drache tief im Berg: Deine Kobolde graben die Höhle jeden Tag weiter, bauen Türme, Fallen und Köder an die Gänge – und jede Nacht kommen Helden, die dir das Glänzendste aus dem Hort tragen wollen, am Ende dein Ei.
 
 ## Leitplanken
 
-Damit Hort nicht nach „100 Genres auf einmal“ wirkt, gelten drei Regeln:
+1. **Ein Kern:** *Wo grabe ich hin, und was baue ich wohin, damit mir keiner etwas klaut?* Jede Mechanik muss diese Frage interessanter machen.
+2. **Drachenlogik-Test:** Jede Regel muss sich mit „weil Drachen, Kobolde und Helden so sind“ erklären lassen. Türme klaut niemand – sie sind in den Fels geschraubt, und Helden wollen Gold, keinen Koboldschrott.
+3. **Kein Genre-Mischmasch:** Tower Defense mit Deck und Bäumen, dazu ein Drache, den man selbst einsetzt. Kein Basisbau außerhalb der Höhle, keine Weltkarte, keine Crafting-Menüs.
 
-1. **Ein Brett, eine Energie, ein Ziel.** Alles passiert im Hort, einem Raster in der Drachenhöhle. Die einzige Ressource ist **Glut** für den Drachenatem. Verloren ist der Run, wenn das **Drachenei** gestohlen wird.
-2. **Drachenlogik-Test.** Jede Mechanik muss sich mit „weil Drachen so sind“ erklären lassen. Sonst fliegt sie raus.
-3. **Jeder Kniff dient der Kernfrage:** *Was lege ich wohin, damit es mir keiner klaut?* Kein Kniff baut ein zweites Spiel daneben.
+## Was sich gegenüber v0.3 ändert
 
-Bewusst **nicht** im Spiel: Basisbau außerhalb des Horts, Crafting-Menüs, eine Weltkarte zum Erkunden, Geld als zweite Währung, direkte Action-Steuerung des Drachen, Dialogsysteme.
+| v0.3 | v0.4 |
+|---|---|
+| Hort als Raster, Schätze anordnen und verschmelzen | Der Hort liegt in der Hortkammer am Ende des Gangs, der Drache sitzt darauf |
+| Raubzüge bestimmen, wer kommt | Das Graben bestimmt, woher und wer kommt (Durchbrüche) |
+| Atem-Karten mit Glut-Leiste | Drei Fähigkeiten des Drachen mit Abklingzeit |
+| Schätze wehren sich selbst | Koboldtürme mit eigenem Baum, Fallen und Köder |
+| Glut als Energie in der Nacht | Glut ist die Währung zwischen den Runs – und geht an den Dieb, wenn das Ei verloren ist |
 
-## Eine Runde = ein Tag und eine Nacht
+## Ein Tag
 
-| Phase | Was passiert | Zeitdruck |
-|---|---|---|
-| **Tag** | Raubziel wählen (1 von 3), Beute aussuchen, Hort ordnen, Schätze verschmelzen | keiner |
-| **Nacht** | Helden stürmen die Höhle und laufen automatisch los. Schätze und Fallen wehren sich von selbst, du greifst mit Atem-Karten ein | ca. 60–90 Sekunden, pausierbar |
-| **Morgen** | Die Ausrüstung besiegter Helden kommt als neue Schätze in den Hort | keiner |
+| Phase | Was passiert |
+|---|---|
+| **Graben** | Drei Stollenstücke zur Wahl, dazu die Richtung. Die Hortkammer zieht einen Abschnitt weiter, der Gang dorthin wird länger. |
+| **Bauen** | Vier Baupläne aus dem eigenen Deck: Türme in die Nischen neben dem Gang, Fallen in den Gang, Köder in eine Nische am Gang. Bezahlt wird mit Gold. Türme lernen Knoten in ihrem Baum, erbeutete Ausrüstung kommt in ihre Fassungen. Die Raben melden, wer heute Nacht durch welchen Eingang kommt. |
+| **Nacht** | Helden laufen zum Glänzendsten, das sie tragen können, und wollen damit wieder hinaus. Türme und Fallen kämpfen von selbst, du setzt die Fähigkeiten des Drachen ein. Pausierbar, doppeltes Tempo möglich. |
+| **Morgen** | Gold (Grundlohn, Goldadern, Besiegte), Glut, Ausrüstung der Besiegten, neue Stufen der Türme. |
 
-Startwerte: Ein Run dauert 12 Nächte, in der letzten kommt der Drachentöter als Boss. Das sind etwa 30 Minuten. Wer gewinnt, brütet das Ei aus. Daraus schlüpft eine neue Drachenart für spätere Runs.
+Ein Run hat 8 Tage, etwa 25–35 Minuten. In der letzten Nacht kommt Siegfried. Wer sie übersteht, brütet das Ei aus.
 
 ## Die Kniffe
 
-### 1. Glanz und Köder
+### 1. Die Höhle wächst (Vorbild: Rogue Tower)
 
-- **Regel:** Jeder Schatz hat Glanz. Helden laufen immer zum glänzendsten Schatz, den sie erreichen können. Das Ei hat einen festen Glanz.
-- **Drachenlogik:** Diebe wollen das, was funkelt.
-- **Kniff:** Katzengold glänzt stark, ist aber wertlos – der perfekte Köder am Eingang. Und je ärmer dein Hort, desto eher wollen sie dein Ei.
-- **Warum es hilft:** Helden werden berechenbar. Man plant, statt zu hoffen, und sieht auf einen Blick, was passiert.
+- **Regel:** Der Berg besteht aus 5 × 5 Abschnitten. Jeden Tag graben die Kobolde einen weiter, und die Hortkammer zieht hinterher. Der Gang vom Höhlenmund bis zum Hort wird jeden Tag länger.
+- **Drachenlogik:** Drachen ziehen sich mit ihrem Hort tiefer in den Berg zurück. Die Kobolde graben voraus.
+- **Kniff:** Führt man den neuen Gang an alten Türmen vorbei, schießen diese auf beide Gänge. Aber der Berg ist begrenzt: Wer sich in eine Ecke gräbt, kommt nicht mehr weiter.
+- **Warum es hilft:** Jeder Run sieht anders aus, und das Graben ist eine echte Entscheidung statt Kulisse.
 
-### 2. Drachenfeuer schmilzt Gold
+### 2. Wer zu gierig gräbt (Vorbild: Cards & Cannons)
 
-- **Regel:** Zwei gleiche Schätze nebeneinander verschmelzen zu einem größeren (Münzen → Barren → Statue). Größere Schätze sind wertvoller, brauchen aber mehr Platz, und ein einzelner Held kann sie nicht tragen.
-- **Vorbild:** Karten stapeln in 9 Kings.
-- **Kniff:** Größe ist Schutz. Eine Goldstatue klaut keiner allein, aber sie nimmt Platz weg, den du für Fallen brauchst.
-- Stufe 4 wird zum **Wahrzeichen** mit eigener Regel (z. B. Goldener Thron: +1 Glut pro Nacht). Höchstens ein Wahrzeichen pro Art.
+- **Regel:** Je tiefer, desto reicher die Stücke: Goldadern bringen jeden Morgen Gold, Grabkammern einen Schatz. Manche Stücke brechen durch – in den Brunnenschacht des Dorfs, einen alten Zwergenstollen oder eine Gruft. Von dort kommen ab dann Helden, auf kürzerem Weg.
+- **Vorbild:** In Cards & Cannons setzt man die Gegner-Spawner selbst. In Hort entscheidet die Gier, wo neue Eingänge entstehen.
 
-### 3. Wen du beraubst, der kommt
-
-- **Regel:** Jeden Tag wählst du eins von drei Raubzielen. Das Ziel bestimmt deine Beute und wer dich in der Nacht heimsucht.
-- **Vorbild:** In Cards & Cannons setzt du die Gegner-Spawner selbst. In Hort machst du dir deine Feinde selbst.
-
-| Raubziel | Beute | Wer nachts kommt |
+| Eingang | Wer kommt | Was es bringt |
 |---|---|---|
-| Dorf | Münzen, Kelche | Diebe, Bauern mit Mistgabeln |
-| Kloster | Reliquien (schützen Nachbarfelder) | Paladine (feuerfest, langsam) |
-| Zwergenmine | Edelsteine (verstärken Nachbarfelder) | Zwerge (graben sich von unten ein) |
-| Magierturm | Schriftrollen (neue Atem-Karten) | Magier (teleportieren einen Schatz weg) |
-| Handelskarawane | viel Gold auf einmal | Söldner (viele, schwach) |
+| Höhlenmund | Diebe und Söldner, von Anfang an | – |
+| Brunnenschacht | Bauern in Scharen, viel Leben | Goldader und die Münzen aus dem Wunschbrunnen |
+| Zwergenstollen | Zwerge in schwerer Rüstung, die Katzengold erkennen | Zwei Goldadern |
+| Gruft | Paladine mit Segen, Magier, die aus der Ferne zaubern | Felsvorsprung und eine Grabbeigabe |
 
-Die Raubziele gehören zu **Nachbarreichen**. In jedem Run sind drei davon dabei (siehe „Jeder Run anders“).
+### 3. Glanz und Köder
 
-### 4. Die Raben berichten
+- **Regel:** Helden holen sich das Glänzendste, was sie tragen können: einen Schatz aus dem Hort, einen Köder in einer Nische oder etwas, das am Boden liegt. Das Ei glänzt mit 4 – liegt nichts Glänzenderes im Hort, wollen sie das Ei.
+- **Kniff:** Katzengold glänzt mit 6. Wer es einsammelt, braucht dreimal so lange – mitten vor den Türmen – und zieht danach mit wertlosem Zeug ab. Je reicher der Hort, desto stärker müssen Köder glänzen.
+- **Warum es hilft:** Man sieht, wohin jeder Held will, und kann ihn umlenken.
 
-- **Regel:** Vor jeder Nacht zeigen dir deine Raben die Heldengruppe mit allen Tricks.
-- **Vorbild:** In 9 Kings siehst du, welche Könige gegen dich antreten.
-- **Warum es hilft:** Keine unfairen Überraschungen. Jeder Verlust fühlt sich wie ein eigener Fehler an, nicht wie Pech.
+### 4. Leben, Rüstung, Segen (Vorbild: Rogue Tower)
 
-### 5. Atem-Karten
+- **Regel:** Helden haben bis zu drei Schichten. Schaden trifft zuerst den Segen (blau), dann die Rüstung (weiß), dann das Leben (rot).
+- **Türme:** Speere und Feuer sind stark gegen Leben, Steine gegen Rüstung, Flüche gegen Segen. Drachenfeuer wirkt gegen alles gleich.
+- **Warum es hilft:** Welche Eingänge man öffnet, bestimmt, welche Türme man braucht. Das verbindet das Graben mit dem Bauen.
 
-- **Regel:** Nachts kämpfen Schätze und Fallen automatisch. Du hast eine kleine Hand Atem-Karten und eine Glut-Leiste, die jede Nacht neu lädt.
-- **Vorbild:** Zauber in der Nachtphase bei Cards & Cannons.
-- **Karten (Auswahl):** Feueratem (Linie), Flügelschlag (stößt Helden zurück), Brüllen (lähmt kurz), Zuschnappen (schnappt einen fliehenden Dieb samt Beute), Rauchwolke (Glanz kurz auf null).
-- **Warum es hilft:** Du greifst gezielt ein, statt hektisch zu steuern. Ruhig genug für Streams, spannend genug für die Messe.
+### 5. Türme mit eigenem Baum (Vorbild: der Passivbaum in Path of Exile 2)
 
-### 6. Beute der Besiegten
+- **Regel:** Jeder Turm sammelt Erfahrung mit jedem Treffer. Jede Stufe bringt einen Punkt für seinen Baum: kleine Knoten, große Knoten, eine zweite Fassung und je Zweig ein Schlussstein, der die Regeln des Turms ändert.
+- **Beispiele für Schlusssteine:** Speerhagel (drei Speere auf drei Helden, jeder schwächer), Felsbrocken (halb so oft, doppelter Schaden, betäubt), Flammenherz (der Brand springt über), Seelenfessel (Verfluchte können nichts greifen, der Stein macht keinen Schaden mehr).
+- **Ausrüstung der Besiegten:** Was Helden fallen lassen, kommt in die Fassungen: Diebesdolch (doppelter Schaden), Zwergenhacke (schlägt Rüstung ab), Zauberstab (Blitz zu zwei weiteren Helden), Paladinschild (doppelt gegen Segen), Mistgabel (stößt zurück), Söldnerklinge, Siegfrieds Balmung.
+- **Warum es hilft:** Keine zwei Türme sind gleich. Die Tiefe steckt in Entscheidungen, nicht in Kartenglück.
 
-- **Regel:** Wer in deiner Höhle fällt, lässt seine Ausrüstung zurück. Sie kommt mitsamt ihrer Fähigkeit in deinen Hort.
-- **Vorbild:** In 9 Kings nimmst du Karten aus dem Deck besiegter Könige.
-- **Beispiele:** Ein Paladinschild schützt alle Nachbarfelder vor Diebstahl. Ein Diebesdolch macht einen Schatz unsichtbar.
-- **Warum es hilft:** Was dich angreift, prägt deinen Build. Über die Raubziele entscheidest du also auch, in welche Richtung dein Build wächst.
+### 6. Der Drache greift ein
 
-## Beispiel: eine Nacht
+- **Regel:** Die Klaue trifft Helden in der Hortkammer von selbst. Dazu drei Fähigkeiten mit Abklingzeit: Feueratem (3 × 3 Felder, überall in der Höhle), Flügelschlag (stößt Helden vor dem Hort zurück, sie lassen fallen, was sie tragen), Brüllen (alle erstarren).
+- **Drachenkraft:** Je wertvoller der Hort, desto härter die Klaue und der Atem. Jeder gestohlene Schatz schwächt den Drachen.
+- **Warum es hilft:** Kein reines Tower Defense – in den entscheidenden Sekunden rettet man das Ei selbst.
 
-Du überfällst das Kloster und nimmst einen Reliquienschrein mit. Die Raben melden drei Paladine (feuerfest) und einen Dieb mit Enterhaken, der auch Schätze aus der zweiten Reihe holt.
+### 7. Siegfried
 
-Du legst Katzengold an den Eingang, verschmilzt zwei Kelche zu einer Statue, die keiner allein tragen kann, und schiebst das Ei hinter den Reliquienschrein. Feueratem bringt gegen Paladine nichts, also hebst du Glut für Flügelschlag auf.
+- **Regel:** In der letzten Nacht kommt der Drachentöter. Er will nur das Ei, zerschlägt im Vorbeigehen Türme (er holt sichtbar aus) und ist von vorn fast unverwundbar. Vollen Schaden nimmt er nur von hinten, am Lindenblatt.
+- **Kniff:** Hat er das Ei, muss er den ganzen Weg zurück – und kehrt allem, was hinter ihm steht, den Rücken zu. Auch die Klaue des Drachen trifft ihn dann voll.
 
-Nachts schnappt sich der Dieb das Katzengold und rennt. Du lässt ihn laufen, es ist ja wertlos. Die Paladine laufen in die Mimik-Truhe, Flügelschlag wirft den letzten zurück. Am Morgen liegt ein Paladinschild in deinem Hort, und ab jetzt sind seine Nachbarfelder vor Diebstahl sicher.
+### 8. Glut und Erzfeinde (Soulslite)
 
-## Was wir aus der Kritik an 9 Kings lernen
+- **Regel:** Besiegte Helden und überstandene Nächte bringen Glut. Gewinnst du, kommt sie mit nach Hause. Verlierst du das Ei, trägt der Dieb deine Glut fort und kommt in einem späteren Run als Erzfeind zurück. Besiegst du ihn, holst du sie dir wieder.
+- **Erzfeinde:** Auch wer mit einem wertvollen Schatz entkommt, bekommt einen Namen und kommt stärker wieder. Höchstens drei gleichzeitig.
+- **Glutnester (geplant):** Zwischen den Schichten des Bergs rasten, umskillen – aber die Helden werden stärker.
 
-| Kritik an 9 Kings | So macht es Hort |
+## Zahlen im Prototyp
+
+- 4 Türme mit je 10 Knoten, 4 Fallen, 3 Köder, 7 Stück Ausrüstung
+- 7 Heldentypen (mit Siegfried), 4 Eingänge, 8 Arten von Stollenstücken
+- 10 Schätze, 3 Fähigkeiten des Drachen, 4 Drachenarten, 10 Legende-Stufen, 9 Taten
+
+Balance-Bot (menschliche Reaktionszeit, Legende 0): etwa 70 % Siege, ohne Fähigkeiten des Drachen gut 20–40 %. Wer jeden Durchbruch mitnimmt, verliert deutlich öfter. Die meisten Niederlagen kommen durch Zwerge, Magier und Siegfried.
+
+## Was wir aus der Kritik lernen
+
+| Kritik | So macht es Hort |
 |---|---|
-| Upgrades enden bei Stufe 3, nur wenige Felder lohnen sich | Verschmelzen verändert Größe und Regeln. Weil Platz knapp ist, zählt jedes Feld |
-| Verzauberungen lassen sich nicht kombinieren | Nachbarschafts-Effekte stapeln sich sichtbar |
-| Roher Schaden schlägt alles, manche Gebäude sind nutzlos | Jeder Heldentyp braucht eine andere Antwort (Paladine feuerfest, Zwerge von unten) |
-| Schwierigkeit springt plötzlich an | Du steuerst die Gefahr über die Raubziele, Runs sind kurz |
-| Kein Controller-Support | Maus, Tastatur und Controller von Anfang an (Steam Deck) |
+| Rogue Tower: Später entscheidet vor allem Kartenglück | Die Tiefe steckt in den Bäumen, die man selbst steuert. Das Deck stellt man vor dem Run selbst zusammen |
+| Rogue Tower: Viele Freischaltungen verwässern den Kartenpool | Freischaltungen landen in der Sammlung, ins Deck kommen nur acht |
+| 9 Kings: Roher Schaden schlägt alles | Leben, Rüstung und Segen verlangen verschiedene Türme |
+| 9 Kings: Schwierigkeit springt plötzlich an | Die Gefahr steigt mit dem, was man selbst gräbt. Die Raben sagen vorher, wer kommt |
+| Tower Defense allgemein: man schaut nur zu | Der Drache greift ein, und Diebe müssen den ganzen Weg zurück |
 
 ## Abgrenzung
 
 | Spiel | Worum es geht | Was Hort anders macht |
 |---|---|---|
-| 9 Kings | Königreich bauen, Armeen kämpfen automatisch | Du bist das Monster, und es geht darum, was geklaut wird |
-| Cards & Cannons | Tower Defense mit Kartendeck | Keine Pfade und Türme: Helden wollen deine Schätze, nicht dich |
-| Wanderburg | Survivor-Action mit fahrender Burg | Ruhiges Planen am Tag, kurze Nächte |
-| Hoard (2011) | Arcade: Drache fliegt selbst, plündert und verteidigt Gold | Roguelite, der Hort ist dein Inventar |
+| Cards & Cannons | Tower Defense mit Kartendeck, Spawner selbst setzen | Die Höhle wächst, Helden wollen hinein *und* wieder hinaus, der Drache greift selbst ein |
+| Rogue Tower | Der Weg wächst, Türme leveln, Karten | Bäume statt Kartenglück, Gier beim Graben, Schutzschichten mit Geschichte |
+| Dungeon Keeper | Dungeon bauen, Monster führen | Kein Wirtschaftsspiel, ein Tag ist in zwei Minuten geplant |
+| 9 Kings | Königreich bauen, Armeen kämpfen automatisch | Man ist das Monster, und es geht darum, was geklaut wird |
 
-9 Kings (in Deutschland von INSTINCT3 vermarktet) und Cards & Cannons (Sidekick Publishing) kommen beide aus HoBs Umfeld. Hort muss sich deshalb klar abheben: Wir übernehmen Prinzipien, keine Systeme.
+## Zwischen den Runs
 
-## Langlebigkeit und Meta-Progression
+Grundsatz: **Mehr Auswahl, nicht mehr Stärke.** Man gewinnt, weil man besser spielt, nicht weil man länger gespielt hat.
 
-Grundsatz: **Langlebig durch Vielfalt und Können, nicht durch Grind.** Meta-Progression schaltet neue Möglichkeiten frei, aber keine dauerhaften Werte-Boni. Einen Run gewinnt man, weil man besser spielt, nicht weil man länger gespielt hat.
+- **Werkstatt der Kobolde:** Glut schaltet neue Baupläne (Steinschlag, Mimik-Truhe, Narrengold) und gesperrte Schlusssteine frei (Speerhagel, Steinregen, Flammenherz, Seelenfessel).
+- **Deck:** Acht Baupläne aus der Sammlung, jeden Tag zieht man vier.
+- **Drachenarten:** Was am Ende im Hort liegt, entscheidet, was schlüpft. Kristalldrache (zwei Edelsteine im Hort: Kristallatem verlangsamt), Knochendrache (70 Gefallene: Knochenwächter), geheimer Mondsilberdrache (drei Helden in einer Nacht mit falschem Gold: Köder glänzen stärker).
+- **Legende:** 10 Stufen je Drachenart, jede bringt eine Regel dazu und Narben am Drachen.
+- **Hortbuch und Taten:** Baupläne, Helden, Schätze, Ausrüstung, Drachen, Taten, Erzfeinde. Unentdecktes zeigt einen Hinweis.
+- **Modi:** Endlose Belagerung (Siegfried alle 8 Nächte), Wochen-Hort, Hort-Codes zum Teilen.
 
-Und: Meta-Progression verlängert nur ein Spiel, dessen Kern schon trägt. Erst wenn eine einzelne Nacht Spaß macht, bauen wir die Systeme drumherum.
-
-### Fünf Gründe für noch einen Run
-
-| Frage nach dem Run | Antwort im Spiel |
-|---|---|
-| Was ist neu? | Brutkammer und Drachenalter |
-| Geht es noch schwerer? | Legende |
-| Was habe ich noch nicht entdeckt? | Hortbuch, Taten und geheime Eier |
-| Wer hat noch eine Rechnung offen? | Erzfeinde |
-| Wie schneide ich gegen andere ab? | Endlose Belagerung, Wochen-Hort, Hort-Codes |
-
-### Jeder Run anders: drei Nachbarreiche
-
-- Dein Revier grenzt in jedem Run an drei zufällige Reiche, z. B. Bauernland, Klosterorden, Zwergenclan, Magierzirkel, Händlerbund. Nur deren Raubziele, Helden und Beute kommen in diesem Run vor.
-- **Vorbild:** In 9 Kings sind in jedem Run drei zufällige Könige deine Feinde.
-- Mit 6 Reichen gibt es 20 Kombinationen, mit 4 Drachenarten 80 verschiedene Starts. Jedes neue Reich per Update erhöht das deutlich.
-
-### Brutkammer: Was du ausbrütest, hängt davon ab, worauf du brütest
-
-- Gewinnst du, schlüpft das Ei. Welche Drachenart schlüpft, entscheiden die acht Felder rund um das Ei: Ab zwei Schätzen einer Art schlüpft deren Drache. Am letzten Tag zeigt das Spiel an, was gerade schlüpfen würde.
-- Schlüpft eine Art, die du schon hast, bekommt sie eine neue Farbvariante.
-- Jede Art hat einen eigenen Start-Hort und eine eigene Regel:
-
-| Drachenart | Wie man sie ausbrütet | Eigene Regel |
-|---|---|---|
-| Golddrache | Startdrache | Keine Sonderregel – der Grunddrache, wie der King of Nothing in 9 Kings |
-| Kristalldrache | Mindestens zwei Edelsteine rund ums Ei | Edelsteine leiten Nachbar-Effekte in gerader Linie weiter |
-| Knochendrache | Mindestens zwei Stück Heldenbeute rund ums Ei | Bis zu drei gefallene Helden stehen in der nächsten Nacht als Knochenwächter auf |
-| Mondsilberdrache (geheim) | Zwei Stück wertloser Tand direkt neben dem Ei | Glanz wirkt umgekehrt: Helden laufen zum *am wenigsten* glänzenden Schatz. Sein Ei glänzt kaum |
-
-### Drachenalter: Fortschritt in jedem Run
-
-- Jede Drachenart hat eine Fortschrittsleiste. Jeder Run füllt sie, auch ein verlorener (überstandene Nächte, besiegte Helden).
-- Jede Stufe legt neue Schätze, Atem-Karten oder Raubziele in den Pool dieser Art. Etwa 10 Stufen pro Art, dann ist sie ausgewachsen.
-- Mehr Auswahl, nicht mehr Stärke.
-
-### Legende: Je berühmter dein Drache, desto bessere Helden kommen
-
-- Nach einem Sieg steigt die Legende dieser Drachenart um eine Stufe, bis Stufe 20. Jede Stufe fügt eine Regel hinzu.
-- Beispiele: Diebe sind schneller · die Raben verraten nur noch zwei von drei Helden · Glut lädt langsamer · Katzengold wird manchmal durchschaut · der Drachentöter bekommt eine zweite Phase.
-- Belohnung ist Ruhm statt Macht: Narben, Hörner und Farben am Drachen zeigen, wie weit man gekommen ist.
-
-### Erzfeinde: Wer entkommt, kommt wieder
-
-- Ein Dieb, der mit deinem Schatz entkommt, bekommt einen Namen und taucht in späteren Runs wieder auf – mit deinem Schatz und stärker als vorher.
-- Besiegst du ihn, holst du den Schatz zurück und hängst seinen Helm an die Trophäenwand.
-- Höchstens drei Erzfeinde gleichzeitig, damit es überschaubar bleibt.
-- Mit Twitch-Anbindung trägt der Erzfeind den Namen des Zuschauers, dessen Held entkommen ist. So jagt ein Streamer einen bestimmten Zuschauer über viele Streams hinweg.
-
-### Hortbuch und Taten: Entdecken statt Abarbeiten
-
-- Das Hortbuch sammelt alles, was du gesehen hast: Schätze, Helden, Verschmelzungen, geheime Kombinationen. Unentdeckte Einträge zeigen nur einen Umriss und einen Hinweis.
-- Taten sind kleine Aufgaben, die besondere Schätze freischalten und gleichzeitig Steam-Erfolge sind. So lernt man nebenbei die Kniffe kennen. Beispiele:
-  - Lass in einer Nacht drei Diebe mit Katzengold entkommen → Narrenkrone
-  - Gewinne eine Nacht, ohne eine Atem-Karte zu spielen → Schlafender Wächter
-  - Verschmelze einen Schatz bis zum Wahrzeichen → Drachenschmiede (neue Atem-Karte)
-
-### Modi nach dem ersten Sieg
-
-- **Endlose Belagerung:** Wie viele Nächte hält dein Hort? Mit Steam-Bestenliste.
-- **Wochen-Hort:** Eine Woche lang spielen alle denselben Run. Bestenliste, aber keine exklusiven Belohnungen: Wer eine Woche verpasst, verpasst nichts.
-- **Hort-Codes:** Einen Run als Code teilen, damit andere ihn nachspielen können. Ideal für Streams und Communities.
-
-Technik: Wochen-Hort und Bestenlisten gehen ohne eigenen Server. Der Run wird aus der Kalenderwoche erzeugt, die Bestenliste läuft über Steam. Den Twitch-Chat kann das Spiel ebenfalls ohne eigenen Server mitlesen.
-
-### Die Höhle zwischen den Runs
-
-Zwischen den Runs ist die Höhle dein Trophäenraum: das Nest mit allen geschlüpften Drachen, die Trophäenwand mit den Helmen besiegter Erzfeinde, das Hortbuch. Fortschritt, den man sieht, ohne dass er das Spiel leichter macht.
-
-### Was das Spiel langlebig hält
-
-- **Early Access mit öffentlicher Roadmap:** Alle 6–8 Wochen ein kostenloses Inhalts-Update mit einem neuen Nachbarreich (Raubziel, Heldenfraktion, Beutefamilie) oder einer neuen Drachenart. 9 Kings ist mit 7 von 9 Königen gestartet und hat die restlichen im Early Access nachgeliefert.
-- **Inhalte als Daten:** Alle Schätze, Helden und Karten stehen in Datendateien statt im Code. Das macht Updates schneller und erlaubt später Mods über den Steam Workshop.
-- **Balance-Bot:** Ein Autopilot spielt tausende Runs und meldet, welche Schätze zu stark oder nutzlos sind – wie der Autopilot im Sim-Racing-Projekt und die Simulation in Runenfall.
-- **Große Meilensteine:** Early-Access-Start, 1.0, später Koop. Jeder ist ein Anlass für Streams, Presse und neue Aufmerksamkeit auf Steam.
-
-### Was wir bewusst weglassen
-
-Battle Pass, Lootboxen, Saison-Pass, tägliche Aufgaben mit Ablaufdatum, Belohnungen nur für einen bestimmten Zeitraum, bezahlte Abkürzungen, Online-Zwang und dauerhafte Werte-Boni. Von genau diesen Dingen sind Spieler 2026 müde, und 9 Kings wird für zähen Grind kritisiert.
-
-### Ausbaustufen
-
-Umgesetzt im Prototyp v0.2: drei Nachbarreiche aus fünf, Brutkammer mit vier Arten und Farbvarianten, Drachenalter (3 Stufen je Art), Legende 1–10, Erzfeinde, Hortbuch, 8 Taten, Endlose Belagerung, Wochen-Hort mit eigenem Bestwert, Hort-Codes, Speicherstand über Geräte hinweg.
-
-Dazu in v0.3: Ton komplett aus dem Code (Effekte, Höhlenatmosphäre, Harfe, Herzschlag bei Gefahr), Controller für Xbox, PlayStation und Steam Deck, eine Desktop-Fassung für Windows und Linux mit Spielstand-Datei für die Steam Cloud und automatischen Builds. Wie es von hier zu Steam geht, steht in [STEAM.md](STEAM.md).
-
-Noch offen sind die Steam-Anbindung (Erfolge für die Taten, Bestenlisten für Endlos und Wochen-Hort), Legende 11–20, Twitch-Helden, Flüche, die wachsende Höhle, der Workshop und Koop.
+## Ausbaustufen
 
 | Stufe | Inhalt |
 |---|---|
-| Demo (Next Fest Juni 2027, gamescom) | 1 Drache, Hortbuch in einfacher Form, erste Taten |
-| Early-Access-Start | 3 Drachenarten + 1 geheime, Drachenalter, Legende 1–10, Erzfeinde, Endlose Belagerung |
-| Updates im Early Access | Neue Nachbarreiche und Drachenarten, Legende bis 20, Wochen-Hort, Hort-Codes, Twitch-Helden, Flüche, wachsende Höhle |
-| 1.0 und danach | Steam Workshop, Koop |
-
-## Weitere Ideen für Updates
-
-- **Flüche:** Verfluchte Schätze sind stark, haben aber einen Haken (z. B. doppelter Glanz für die Nachbarn). Passt zum Mythos vom verfluchten Nibelungenhort.
-- **Die Höhle wächst:** Ab bestimmten Hort-Werten wird das Raster größer.
-- **Koop:** zwei Drachen, ein Hort – und jeder klaut beim anderen.
-
-## Umfang der ersten Demo (Vorschlag)
-
-- 1 Drache, 5 Raubziele, 8 Heldentypen, rund 30 Schätze, 8 Atem-Karten
-- 6 Nächte, etwa 12–15 Minuten – passend für einen Messe-Platz
-- Maus, Tastatur und Controller von Anfang an
+| Prototyp v0.4 (jetzt) | Erste Schicht des Bergs, 8 Tage, alles oben Genannte |
+| Demo (Next Fest Juni 2027, gamescom) | Feinschliff, Einführung zum Mitspielen, Bestenliste, ein Pixel-Artist für Drache und Kobolde |
+| Early Access | Drei Schichten (Gestein, Zwergenminen, Glutschlund) mit Glutnestern dazwischen, mehr Türme und Bäume, mehr Eingänge und Heldenfraktionen |
+| Updates und 1.0 | Neue Drachenarten, Legende bis 20, Twitch-Helden, Steam Workshop, Koop |
 
 ## Offene Fragen
 
-1. **Nachtkampf:** Automatisch mit Atem-Karten (Vorschlag) oder den Drachen direkt steuern?
-2. **Setting:** Eigene Fantasy-Welt oder deutsche Sagenwelt (Nibelungen, Fafnir)?
-3. **Grafikstil:** Pixel-Art mit Licht (seit dem Stil-Test im Oktober 2026): 16 Pixel pro Feld, von Hand gesetzte Sprites, Licht und Glühen darüber. Ohne KI-Bilder, läuft auch auf schwachen PCs. Für die gamescom lohnt sich ein Pixel-Artist für Drache, Store-Bilder und Feinschliff.
-4. **Meta-Progression:** Nur Freischaltungen (Vorschlag) oder zusätzlich kleine dauerhafte Boni wie in Runenfall?
+1. **Köder:** Laut Bot sind Türme pro Gold noch stärker als Köder. Erst beim Spielen klären, ob das stimmt.
+2. **Dauer:** Sind 8 Tage richtig für die erste Schicht?
+3. **Kobolde sichtbar machen:** Graben und Bauen mit kleinen Kobold-Animationen?
+4. **Setting:** Deutsche Sagenwelt (Nibelungen, Siegfried, Lindenblatt) als roter Faden für alle Bosse?
 
 ## Referenzen
 
-- 9 Kings: [Early-Access-Test](https://www.elliotcsmith.com/9-kings-early-access-review/), [Spieler-Kritik (Zusammenfassung)](https://vaporlens.app/app/2784470/9_kings), [Steam Deck](https://steamdeckhq.com/game-reviews/9-kings/), [Anspielbericht Mein-MMO](https://mein-mmo.de/9-kings-steam-anspielbericht/)
-- Cards & Cannons: [Steam](https://store.steampowered.com/app/4536920/Cards__Cannons/), [Deutscher Computerspielpreis](https://deutscher-computerspielpreis.de/chronik/cards-and-cannons/?lang=en), [GamesMarket](https://www.gamesmarket.global/flamehead-games-fresh-take-on-the-classic-tower-defence-formula/)
-- Hoard (2011): [Steam](https://store.steampowered.com/app/63000)
-- 9 Kings im Early Access: [Start mit 7 von 9 Königen](https://www.gamedeveloper.com/press-release/roguelite-kingdom-builder-9-kings-is-out-now-in-early-access), [neunter König per Update](https://www.pcgamesn.com/9-kings/update-king-of-time), [weitere Pläne](https://turnbasedlovers.com/news/strategy-roguelite-9-kings-gets-a-new-time-traveling-ruler/)
+- Cards & Cannons: [Steam](https://store.steampowered.com/app/4536920/Cards__Cannons/), [Flamehead Games](https://flameheadgames.com/), [Closed Beta](https://playtester.io/cards-and-cannons), [Interview](https://feedbagel.com/post/flamehead-games-fresh-take-on-the-classic-tower-defense-formula)
+- Rogue Tower: [Steam](https://store.steampowered.com/app/1843760/Rogue_Tower), [Test bei IndieHellZone](https://indiehellzone.com/2022/02/21/rogue-tower/), [Einsteiger-Guide](https://gamepretty.com/rogue-tower-beginners-guide-game-mechanics-strategies/), [Kritik am Kartenglück](https://steamcommunity.com/app/1843760/discussions/0/3825299364576183432)
+- 9 Kings: [Early-Access-Test](https://www.elliotcsmith.com/9-kings-early-access-review/), [Spieler-Kritik (Zusammenfassung)](https://vaporlens.app/app/2784470/9_kings)
 - Live-Service-Müdigkeit: [Club386](https://www.club386.com/why-live-service-fatigue-growing-gamers/)

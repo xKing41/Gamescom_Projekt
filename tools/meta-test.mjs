@@ -1,11 +1,12 @@
-// Tests für die Meta-Progression: Erfahrung, Freischaltungen, Taten, Erzfeinde, Zusammenführen.
+// Tests für die Meta-Progression und die Spiellogik dahinter: Glut, Werkstatt, Deck, Taten, Erzfeinde,
+// Schlüpfen, Zusammenführen, alte Spielstände und dass ein Run aus seinem Seed exakt nachspielbar ist.
 //
 //   node tools/meta-test.mjs
 
 import assert from 'node:assert/strict';
 import * as Sim from '../src/sim.js';
 import * as Meta from '../src/meta.js';
-import { META, UNLOCKS, BASE_CARDS, STANDARD_RULES } from '../src/data.js';
+import { META, UNLOCKS, BASE_DECK, DECK_SIZE, STANDARD_RULES, CONFIG } from '../src/data.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -13,7 +14,7 @@ function test(name, fn) {
     fn();
     passed += 1;
   } catch (e) {
-    console.error(`✗ ${name}\n  ${e.message}`);
+    console.error(`✗ ${name}\n  ${e.stack}`);
     process.exit(1);
   }
 }
@@ -22,11 +23,23 @@ function test(name, fn) {
 function wonRun(options = {}, patch = {}) {
   const state = Sim.createRun(42, options);
   state.phase = 'won';
-  state.stats.nightsSurvived = 6;
+  state.glut = 120;
+  state.stats.nightsSurvived = 8;
   state.stats.defeated = 40;
   state.species = 'kristall';
-  state.runLog.nights = [1, 2, 3, 4, 5, 6].map((night) => ({ night, cards: 3, decoyEscapes: 0, stolen: 1 }));
+  state.runLog.nights = [1, 2, 3, 4, 5, 6, 7, 8].map((night) => ({ night, abilities: 3, decoyEscapes: 0, stolen: 1 }));
   Object.assign(state.runLog, patch);
+  return state;
+}
+
+function lostRun(lostBy = 'dieb', patch = {}, options = {}) {
+  const state = Sim.createRun(7, options);
+  state.phase = 'lost';
+  state.glut = 55;
+  state.lostBy = lostBy;
+  state.stats.nightsSurvived = 3;
+  state.runLog.nights = [1, 2, 3, 4].map((night) => ({ night, abilities: 2, decoyEscapes: 0, stolen: 1 }));
+  Object.assign(state, patch);
   return state;
 }
 
@@ -36,23 +49,52 @@ const rand = () => ((seq = (seq * 9301 + 49297) % 233280) / 233280);
 test('Neues Profil übersteht Speichern und Laden', () => {
   const p = Meta.newProfile();
   assert.deepEqual(Meta.sanitizeProfile(JSON.parse(JSON.stringify(p))), p);
+  assert.equal(p.deck.length, DECK_SIZE);
 });
 
 test('Kaputte oder fremde Daten ergeben ein frisches Profil', () => {
-  for (const junk of [null, 42, 'x', { version: 99 }, { version: 1, species: 'kaputt', unlocks: 'nein', nemeses: [{}] }]) {
+  for (const junk of [null, 42, 'x', { version: 99 }, { version: 2, species: 'kaputt', unlocks: 'nein', nemeses: [{}], deck: ['gibtsnicht'] }]) {
     const p = Meta.sanitizeProfile(junk);
     assert.ok(p.species.gold);
     assert.deepEqual(p.unlocks, []);
     assert.deepEqual(p.nemeses, []);
+    assert.deepEqual(p.deck, BASE_DECK);
   }
 });
 
-test('Erster Sieg: Erfahrung, Stufe, neue Art, Legende und Tat', () => {
+test('Alter Spielstand: Drachen, Legende und Erzfeinde bleiben, für Freischaltungen gibt es Glut', () => {
+  const old = {
+    version: 1,
+    species: { gold: { hatched: 2, xp: 300, legend: 3, variant: 1 }, kristall: { hatched: 1, xp: 20, legend: 0, variant: 0 } },
+    unlocks: ['krone', 'endlos', 'woche', 'rauch'],
+    deeds: ['brut', 'koeder', 'schmied'],
+    loadout: ['feuer'],
+    seen: { treasures: ['ei', 'krone', 'gibtsnicht'], heroes: ['dieb'] },
+    nemeses: [{ id: 'eX', name: 'Kunibert Langfinger', type: 'dieb', treasure: 'krone', rank: 2 }],
+    trophies: [],
+    stats: { runs: 6, wins: 2, nights: 30, defeated: 200 },
+    best: { endless: 9, weekly: null },
+    choice: { species: 'kristall', legend: 0, mode: 'endless' },
+    introSeen: true,
+  };
+  const p = Meta.sanitizeProfile(old);
+  assert.equal(p.version, Meta.PROFILE_VERSION);
+  assert.equal(p.species.gold.legend, 3);
+  assert.ok(p.species.kristall);
+  assert.equal(p.nemeses[0].glut, 0);
+  assert.equal(p.nemeses[0].treasure, 'krone');
+  assert.ok(Meta.glutOf(p) > 0, 'Glut als Ausgleich');
+  assert.ok(p.unlocks.includes('endlos') && p.unlocks.includes('woche'));
+  assert.ok(p.unlocks.includes('narrengold'), 'Belohnung der alten Tat Köderkönig');
+  assert.ok(!p.deeds.includes('schmied'), 'Taten, die es nicht mehr gibt, fallen weg');
+  assert.deepEqual(p.seen.treasures, ['ei', 'krone']);
+  assert.equal(p.introSeen, false, 'Das neue Spiel wird erklärt');
+});
+
+test('Sieg: Glut kommt nach Hause, neue Art, Legende und Taten', () => {
   const { profile, report } = Meta.applyRun(Meta.newProfile(), wonRun(), { rand, now: 1000 });
-  assert.equal(report.xp, 6 * META.xpPerNight + 40 * META.xpPerDefeat + META.xpWin);
-  assert.equal(report.levelBefore, 0);
-  assert.equal(report.levelAfter, 1);
-  assert.ok(profile.unlocks.includes('krone'), 'Golddrache Stufe 1 schaltet die Krone frei');
+  assert.equal(report.glutBanked, 120);
+  assert.equal(Meta.glutOf(profile), 120);
   assert.equal(report.hatched, 'kristall');
   assert.ok(report.newSpecies);
   assert.ok(profile.species.kristall);
@@ -64,24 +106,64 @@ test('Erster Sieg: Erfahrung, Stufe, neue Art, Legende und Tat', () => {
 });
 
 test('Dieselbe Art noch einmal ausgebrütet gibt eine Farbvariante', () => {
-  let p = Meta.applyRun(Meta.newProfile(), wonRun(), { rand }).profile;
+  const p = Meta.applyRun(Meta.newProfile(), wonRun(), { rand }).profile;
   const { profile, report } = Meta.applyRun(p, wonRun(), { rand });
   assert.ok(!report.newSpecies);
   assert.ok(report.newVariant);
   assert.equal(profile.species.kristall.hatched, 2);
   assert.equal(Meta.variantsOf(profile, 'kristall'), 2);
-  p = profile;
 });
 
-test('Verlorener Run gibt trotzdem Erfahrung, aber keine Legende', () => {
-  const state = Sim.createRun(7);
-  state.phase = 'lost';
-  state.stats.nightsSurvived = 3;
-  state.stats.defeated = 12;
-  const { profile, report } = Meta.applyRun(Meta.newProfile(), state, { rand });
-  assert.equal(report.xp, 3 * META.xpPerNight + 12);
+test('Ei verloren: Der Dieb trägt die Glut fort und wird zum Erzfeind', () => {
+  const { profile, report } = Meta.applyRun(Meta.newProfile(), lostRun('magier'), { rand, now: 5000 });
+  assert.equal(Meta.glutOf(profile), 0);
+  assert.equal(report.glutBanked, 0);
+  assert.equal(report.glutLostTo.type, 'magier');
+  assert.equal(profile.nemeses.length, 1);
+  assert.equal(profile.nemeses[0].glut, 55);
+  assert.equal(profile.nemeses[0].treasure, null);
   assert.equal(profile.species.gold.legend, 0);
-  assert.equal(report.hatched, null);
+});
+
+test('Stiehlt ein Erzfeind das Ei, wächst seine Glut', () => {
+  const nemesis = { id: 'eA', name: 'Hedwig Steinbart', type: 'zwerg', treasure: null, glut: 30, rank: 1 };
+  const p = Meta.newProfile();
+  p.nemeses = [nemesis];
+  const state = lostRun('zwerg', { lostNemesis: 'eA' }, { nemeses: [nemesis] });
+  state.runLog.nemesisEscaped = ['eA'];
+  const { profile } = Meta.applyRun(p, state, { rand });
+  assert.equal(profile.nemeses.length, 1);
+  assert.equal(profile.nemeses[0].glut, 85);
+  assert.equal(profile.nemeses[0].rank, 2);
+});
+
+test('Siegfried behält die Glut und bringt sie in der letzten Nacht mit', () => {
+  const { profile } = Meta.applyRun(Meta.newProfile(), lostRun('siegfried'), { rand });
+  const sieg = profile.nemeses.find((n) => n.type === 'siegfried');
+  assert.equal(sieg.glut, 55);
+  const state = Sim.createRun(11, Meta.runOptions(profile));
+  assert.deepEqual(state.nemesesWaiting, [], 'Siegfried kommt nicht als zusätzlicher Held');
+  state.night = state.nights;
+  state.phase = 'dig';
+  state.offers = [];
+  Sim.skipDig(state);
+  assert.ok(state.party.some((p) => p.type === 'siegfried'));
+  Sim.startNight(state);
+  Sim.update(state, 6);
+  const h = state.heroes.find((x) => x.type === 'siegfried');
+  assert.ok(h, 'Siegfried ist da');
+  assert.equal(h.glut, 55);
+  assert.equal(h.nemesis, sieg.id);
+});
+
+test('In Endlos und Wochen-Hort geht keine Glut verloren', () => {
+  const p = Meta.newProfile();
+  p.unlocks = ['endlos', 'woche'];
+  for (const mode of ['endless', 'weekly']) {
+    const { profile, report } = Meta.applyRun(p, lostRun('dieb', {}, { mode }), { rand });
+    assert.equal(report.glutBanked, 55, mode);
+    assert.equal(profile.nemeses.length, 0, mode);
+  }
 });
 
 test('Erzfeinde entstehen, steigen auf und werden zur Trophäe', () => {
@@ -90,11 +172,10 @@ test('Erzfeinde entstehen, steigen auf und werden zur Trophäe', () => {
   assert.equal(report.nemesesNew.length, 2);
   const [first, second] = profile.nemeses;
   assert.match(first.name, /^\S+ \S+$/);
-
   ({ profile, report } = Meta.applyRun(profile, wonRun({}, { nemesisEscaped: [first.id] }), { rand }));
   assert.equal(profile.nemeses.find((n) => n.id === first.id).rank, 2);
-
-  ({ profile, report } = Meta.applyRun(profile, wonRun({}, { nemesisDefeated: [second.id] }), { rand, now: 9000 }));
+  const state = wonRun({ nemeses: profile.nemeses }, { nemesisDefeated: [second.id] });
+  ({ profile, report } = Meta.applyRun(profile, state, { rand, now: 9000 }));
   assert.equal(profile.nemeses.length, 1);
   assert.equal(profile.trophies.length, 1);
   assert.equal(profile.trophies[0].name, second.name);
@@ -108,41 +189,58 @@ test('Höchstens drei Erzfeinde gleichzeitig', () => {
 });
 
 test('Taten werden aus dem Protokoll erkannt', () => {
-  const nights = [
-    { night: 1, cards: 0, decoyEscapes: 3, stolen: 0 },
-    { night: 2, cards: 2, decoyEscapes: 0, stolen: 1 },
-    { night: 3, cards: 1, decoyEscapes: 0, stolen: 0 },
-  ];
-  const state = Sim.createRun(3);
-  state.phase = 'lost';
-  state.stats.nightsSurvived = 3;
-  Object.assign(state.runLog, { nights, landmark: true, maxHoard: 18 });
+  const state = lostRun('dieb');
+  state.stats.nightsSurvived = 4;
+  Object.assign(state.runLog, {
+    nights: [
+      { night: 1, abilities: 2, decoyEscapes: 3, stolen: 0 },
+      { night: 2, abilities: 0, decoyEscapes: 0, stolen: 1 },
+      { night: 3, abilities: 1, decoyEscapes: 0, stolen: 0 },
+      { night: 4, abilities: 1, decoyEscapes: 0, stolen: 1 },
+    ],
+    keystone: true,
+    maxDepth: 4,
+    siegfried: { killed: true, touchedEgg: false },
+  });
   const { profile, report } = Meta.applyRun(Meta.newProfile(), state, { rand });
-  for (const id of ['koeder', 'still', 'schmied', 'unberuehrt', 'hort']) assert.ok(report.deeds.includes(id), id);
-  assert.ok(profile.unlocks.includes('narrenkrone') && profile.unlocks.includes('steinwaechter'));
+  for (const id of ['koeder', 'still', 'schluss', 'unberuehrt', 'tief', 'lindenblatt']) assert.ok(report.deeds.includes(id), id);
+  assert.ok(profile.unlocks.includes('narrengold') && profile.unlocks.includes('mimik'));
   assert.ok(!report.deeds.includes('brut'));
 });
 
-test('Zwei Geräte: Fortschritt wird zusammengeführt, nichts geht verloren', () => {
-  const a = Meta.newProfile();
-  a.updatedAt = 10;
-  a.species.gold.xp = 100;
-  a.unlocks = ['krone'];
-  a.deeds = ['still'];
-  a.trophies = [{ id: 'eA-1', name: 'Ulrich Langfinger', type: 'dieb', treasure: 'kelch', rank: 1, at: 1 }];
-  const b = Meta.newProfile();
-  b.updatedAt = 20;
-  b.species.gold.xp = 60;
-  b.species.kristall = { hatched: 1, xp: 30, legend: 0, variant: 0 };
-  b.unlocks = ['saphir'];
-  b.nemeses = [{ id: 'eA', name: 'Ulrich Langfinger', type: 'dieb', treasure: 'kelch', rank: 2 }];
-  const m = Meta.mergeProfiles(a, b);
-  assert.equal(m.species.gold.xp, 100);
-  assert.ok(m.species.kristall);
-  assert.deepEqual(m.unlocks.sort(), ['krone', 'saphir']);
-  assert.deepEqual(m.deeds, ['still']);
-  assert.equal(m.nemeses.length, 0, 'Auf dem anderen Gerät besiegt – also kein Erzfeind mehr');
-  assert.equal(Meta.mergeProfiles(m, m).species.gold.xp, 100);
+test('Werkstatt: Glut gegen Baupläne und Schlusssteine', () => {
+  const p = Meta.newProfile();
+  p.glutEarned = 100;
+  assert.equal(Meta.buyUnlock(p, 'steinschlag').ok, true);
+  const after = Meta.buyUnlock(p, 'steinschlag').profile;
+  assert.equal(Meta.glutOf(after), 100 - UNLOCKS.steinschlag.glut);
+  assert.ok(Meta.availableBuildings(after).includes('steinschlag'));
+  assert.equal(Meta.buyUnlock(after, 'steinschlag').ok, false, 'Nicht zweimal kaufen');
+  const poor = Meta.newProfile();
+  assert.equal(Meta.buyUnlock(poor, 'mimik').ok, false);
+  assert.match(Meta.buyUnlock(poor, 'mimik').reason, /Glut/);
+});
+
+test('Deck: genau acht Baupläne, nur was freigeschaltet ist', () => {
+  const p = Meta.newProfile();
+  p.unlocks = ['mimik', 'steinschlag'];
+  p.deck = ['mimik', 'speer', 'speer', 'gibtsnicht', 'narrengold'];
+  const deck = Meta.validDeck(p);
+  assert.equal(deck.length, DECK_SIZE);
+  assert.equal(deck[0], 'mimik');
+  assert.ok(!deck.includes('narrengold'), 'Narrengold ist nicht freigeschaltet');
+  assert.equal(new Set(deck).size, DECK_SIZE);
+  const state = Sim.createRun(5, Meta.runOptions({ ...p, deck }));
+  assert.equal(state.deck.draw.length + state.deck.hand.length, DECK_SIZE);
+});
+
+test('Gesperrte Modi und Stufen fallen auf Erlaubtes zurück', () => {
+  const p = Meta.newProfile();
+  p.choice.mode = 'endless';
+  p.choice.legend = 7;
+  const o = Meta.runOptions(p);
+  assert.equal(o.mode, 'normal');
+  assert.equal(o.legend, 0);
 });
 
 test('Wochen-Hort und Hort-Codes nutzen feste Regeln', () => {
@@ -151,56 +249,120 @@ test('Wochen-Hort und Hort-Codes nutzen feste Regeln', () => {
   p.choice = { species: 'gold', legend: 3, mode: 'weekly' };
   const o = Meta.runOptions(p);
   assert.equal(o.mode, 'weekly');
-  assert.deepEqual(o.cards, STANDARD_RULES.cards);
+  assert.deepEqual(o.deck, STANDARD_RULES.deck);
   assert.deepEqual(o.unlocks, []);
   assert.equal(o.legend, 0);
   assert.equal(Meta.weekKey(new Date(2026, 9, 23)), '2026-W43');
   assert.equal(Meta.weekKey(new Date(2027, 0, 1)), '2026-W53');
-  assert.equal(Meta.weekSeed('2026-W43'), Meta.weekSeed('2026-W43'));
 });
 
-test('Gesperrte Modi und Karten fallen auf Erlaubtes zurück', () => {
-  const p = Meta.newProfile();
-  p.choice.mode = 'endless';
-  p.choice.legend = 7;
-  p.loadout = ['glutregen', 'feuer'];
-  const o = Meta.runOptions(p);
-  assert.equal(o.mode, 'normal');
-  assert.equal(o.legend, 0);
-  assert.deepEqual(o.cards, ['feuer', ...BASE_CARDS.filter((c) => c !== 'feuer')]);
+test('Zwei Geräte: Fortschritt wird zusammengeführt, nichts geht verloren', () => {
+  const a = Meta.newProfile();
+  a.updatedAt = 10;
+  a.glutEarned = 200;
+  a.glutSpent = 40;
+  a.unlocks = ['mimik'];
+  a.deeds = ['still'];
+  a.trophies = [{ id: 'eA-1', name: 'Ulrich Langfinger', type: 'dieb', treasure: 'kelch', rank: 1, at: 1 }];
+  const b = Meta.newProfile();
+  b.updatedAt = 20;
+  b.glutEarned = 150;
+  b.glutSpent = 75;
+  b.species.kristall = { hatched: 1, legend: 0, variant: 0 };
+  b.unlocks = ['steinschlag'];
+  b.nemeses = [{ id: 'eA', name: 'Ulrich Langfinger', type: 'dieb', treasure: 'kelch', glut: 0, rank: 2 }];
+  const m = Meta.mergeProfiles(a, b);
+  assert.equal(m.glutEarned, 200);
+  assert.equal(m.glutSpent, 75);
+  assert.ok(m.species.kristall);
+  assert.deepEqual(m.unlocks.sort(), ['mimik', 'steinschlag']);
+  assert.deepEqual(m.deeds, ['still']);
+  assert.equal(m.nemeses.length, 0, 'Auf dem anderen Gerät besiegt – also kein Erzfeind mehr');
+  assert.deepEqual(Meta.mergeProfiles(m, m), m);
 });
 
-test('Run-Optionen kommen in der Spiellogik an', () => {
-  const p = Meta.newProfile();
-  p.species.knochen = { hatched: 1, xp: 0, legend: 4, variant: 0 };
-  p.unlocks = ['schwanz', 'turm', 'karawane'];
-  p.loadout = ['schwanz', 'feuer', 'schnapp', 'bruellen'];
-  p.choice = { species: 'knochen', legend: 4, mode: 'normal' };
-  const state = Sim.createRun(99, Meta.runOptions(p));
-  assert.equal(state.opts.species, 'knochen');
-  assert.equal(state.opts.legend, 4);
-  assert.ok(state.mods.hiddenGroup);
-  assert.deepEqual(state.opts.cards, ['schwanz', 'feuer', 'schnapp', 'bruellen']);
-  assert.equal(state.realms.length, 3);
-  assert.equal(Sim.itemAt(state, 4, 2).id, 'dolch', 'Start-Hort des Knochendrachen');
-});
-
-test('Schlüpfen hängt von den acht Feldern ums Ei ab', () => {
+test('Schlüpfen: Köder, Edelsteine oder viele Gefallene', () => {
   const state = Sim.createRun(1);
-  state.hoard.fill(null);
-  const put = (id, c, r) => { state.hoard[r * 12 + c] = { uid: c * 100 + r, id }; };
-  put('ei', 5, 3);
   assert.equal(Sim.computeHatch(state), 'gold');
-  put('rubin', 4, 2);
-  put('saphir', 6, 4);
+  state.hoard.push({ uid: 900, id: 'rubin' }, { uid: 901, id: 'saphir' });
   assert.equal(Sim.computeHatch(state), 'kristall');
-  put('dolch', 4, 3);
-  put('hacke', 6, 3);
-  put('schild', 5, 4);
+  state.hoard = state.hoard.filter((i) => i.id !== 'rubin');
+  state.stats.defeated = 80;
   assert.equal(Sim.computeHatch(state), 'knochen');
-  put('katzengold', 5, 2);
-  put('narrengold', 4, 3);
+  state.runLog.nights.push({ night: 3, abilities: 0, decoyEscapes: 3, stolen: 0 });
   assert.equal(Sim.computeHatch(state), 'mond');
+});
+
+// Ein Run nur aus Seed und Entscheidungen: zweimal gespielt, muss genau gleich ausgehen
+function scripted(seed) {
+  const s = Sim.createRun(seed);
+  const log = [];
+  for (let n = 0; n < 4 && s.phase !== 'lost'; n++) {
+    if (s.offers.length) Sim.dig(s, 0, Sim.digDirections(s)[0].dir);
+    else Sim.skipDig(s);
+    for (let i = s.deck.hand.length - 1; i >= 0; i--) {
+      for (let r = 1; r < 16; r++) for (let c = 0; c < 15; c++) if (s.deck.hand[i] && Sim.canPlace(s, s.deck.hand[i], c, r).ok && s.gold >= 30) Sim.playCard(s, i, c, r);
+    }
+    Sim.startNight(s);
+    while (s.phase === 'night') Sim.update(s, 0.25);
+    log.push(`${s.phase}:${s.gold}:${s.glut}:${s.stats.defeated}:${s.hoard.length}`);
+    if (s.phase === 'morning') Sim.nextDay(s);
+  }
+  return log.join('|');
+}
+
+test('Gleicher Seed, gleiche Entscheidungen – gleicher Run', () => {
+  assert.equal(scripted(123), scripted(123));
+  assert.notEqual(scripted(123), scripted(456));
+});
+
+test('Spielstand eines Runs übersteht Speichern und Laden', () => {
+  const s = Sim.createRun(77);
+  Sim.dig(s, 0, Sim.digDirections(s)[0].dir);
+  const copy = Sim.restore(Sim.snapshot(s));
+  assert.deepEqual(copy.tiles, s.tiles);
+  assert.deepEqual(copy.deck, s.deck);
+  assert.equal(copy.phase, 'build');
+  assert.equal(Sim.restore('{"version":1}'), null);
+});
+
+test('Graben: Die Hortkammer zieht weiter, der Weg wird länger', () => {
+  const s = Sim.createRun(3);
+  const before = s.tiles.filter((t) => t === '.').length;
+  const { cx, cy } = s.chamber;
+  const dir = Sim.digDirections(s)[0];
+  Sim.dig(s, 0, dir.dir);
+  assert.deepEqual([s.chamber.cx, s.chamber.cy], [dir.cx, dir.cy]);
+  assert.ok(s.pieces.some((p) => p.cx === cx && p.cy === cy));
+  assert.equal(s.tiles.filter((t) => t === '.').length, before + 3);
+  assert.equal(s.phase, 'build');
+  assert.equal(s.deck.hand.length, CONFIG.handSize);
+});
+
+test('Türme: Punkte nur mit Erfahrung, Knoten nur am Baum entlang', () => {
+  const s = Sim.createRun(9);
+  Sim.dig(s, 0, Sim.digDirections(s)[0].dir);
+  s.gold = 500;
+  s.deck.hand = ['speer'];
+  let spot = null;
+  for (let r = 1; r < 16 && !spot; r++) for (let c = 0; c < 15 && !spot; c++) if (Sim.canPlace(s, 'speer', c, r).ok) spot = { c, r };
+  const { uid } = Sim.playCard(s, 0, spot.c, spot.r);
+  const b = Sim.buildingByUid(s, uid);
+  assert.equal(Sim.learnNode(s, uid, 'A1').ok, false, 'ohne Punkt');
+  b.level = 2;
+  assert.equal(Sim.learnNode(s, uid, 'A3').ok, false, 'nicht erreichbar');
+  assert.equal(Sim.learnNode(s, uid, 'A1').ok, true);
+  assert.equal(Sim.learnNode(s, uid, 'A2').ok, true);
+  assert.equal(Sim.pointsLeft(b), 0);
+  assert.ok(Sim.towerStats(s, b).crit > 0);
+  b.level = 9;
+  assert.equal(Sim.nodeState(s, b, 'A4'), 'blocked');
+  assert.equal(Sim.learnNode(s, uid, 'S').ok, true, 'Fassung über A2 erreichbar');
+  assert.equal(Sim.towerStats(s, b).sockets, 2);
+  for (const n of ['B2', 'B3']) assert.equal(Sim.learnNode(s, uid, n).ok, true, n);
+  assert.equal(Sim.nodeState(s, b, 'B4'), 'locked', 'Speerhagel erst in der Werkstatt');
+  assert.equal(Sim.respec(s, uid).ok, true);
+  assert.deepEqual(b.nodes, ['R']);
 });
 
 console.log(`${passed} Tests bestanden`);

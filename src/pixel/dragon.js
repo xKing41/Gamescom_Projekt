@@ -253,3 +253,134 @@ export function dragonImage(pal, { awake = false, spread = 0, mouth = false, sca
     return c;
   });
 }
+
+// ── Der Drache auf seinem Hort (48 × 40) ──
+// Kleiner als das Bild in der Höhle zwischen den Runs: großer Kopf, Flügel zur Seite, die Klauen auf dem Gold.
+export const HOARD_DRAGON_W = 48;
+export const HOARD_DRAGON_H = 40;
+export const HOARD_HEAD_X = 24;
+export const HOARD_HEAD_Y = 2;
+
+function smallWing(pal, spread) {
+  const lerp = (a, b) => a + (b - a) * spread;
+  const S = [20, 16];
+  const J = [lerp(15, 7), lerp(9, 3)];
+  const tips = [[lerp(10, 0), lerp(16, 8)], [lerp(12, 2), lerp(22, 20)], [lerp(16, 9), lerp(26, 28)]];
+  const back = [19, 25];
+  return pixelize(HOARD_DRAGON_W / 2, HOARD_DRAGON_H, (g) => {
+    g.fillStyle = pal.wing[0];
+    g.beginPath();
+    g.moveTo(...S);
+    g.lineTo(...J);
+    g.lineTo(...tips[0]);
+    for (let i = 1; i < tips.length; i++) {
+      const a = tips[i - 1];
+      const b = tips[i];
+      g.quadraticCurveTo((a[0] + b[0]) / 2 + (J[0] - (a[0] + b[0]) / 2) * 0.3, (a[1] + b[1]) / 2 + (J[1] - (a[1] + b[1]) / 2) * 0.3, ...b);
+    }
+    g.lineTo(...back);
+    g.closePath();
+    g.fill();
+    g.fillStyle = pal.wing[1];
+    g.beginPath();
+    g.moveTo(...J);
+    g.lineTo(...tips[1]);
+    g.lineTo(...tips[2]);
+    g.lineTo(...back);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = pal.wing[2];
+    g.lineWidth = 1.4;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(...S);
+    g.lineTo(...J);
+    for (const t of tips) {
+      g.moveTo(...J);
+      g.lineTo(...t);
+    }
+    g.stroke();
+  }, { ramp: [pal.wing[0], pal.wing[1], pal.wing[2], pal.wing[3]], outline: mix(OUTLINE, pal.wing[1], 0.3) });
+}
+
+function smallBody(pal) {
+  return pixelize(HOARD_DRAGON_W, HOARD_DRAGON_H, (g) => {
+    // Schwanz rechts herum nach vorn
+    g.strokeStyle = pal.body[1];
+    g.lineCap = 'round';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(30, 24);
+    g.quadraticCurveTo(44, 26, 41, 35);
+    g.stroke();
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.moveTo(41, 34);
+    g.quadraticCurveTo(38, 38, 33, 37);
+    g.stroke();
+    g.fillStyle = pal.body[2];
+    g.beginPath();
+    g.moveTo(33, 34.5);
+    g.lineTo(28, 37.5);
+    g.lineTo(33, 39);
+    g.closePath();
+    g.fill();
+    // Rumpf
+    const grad = g.createLinearGradient(0, 12, 0, 32);
+    grad.addColorStop(0, pal.body[0]);
+    grad.addColorStop(0.5, pal.body[1]);
+    grad.addColorStop(1, pal.body[2]);
+    g.fillStyle = grad;
+    g.beginPath();
+    g.ellipse(24, 23, 12, 8.5, 0, 0, Math.PI * 2);
+    g.fill();
+    // Brust
+    g.fillStyle = pal.head[0];
+    g.beginPath();
+    g.ellipse(24, 28, 6.5, 5, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = pal.head[1];
+    g.lineWidth = 1;
+    for (const y of [27.5, 30.5]) {
+      g.beginPath();
+      g.moveTo(19, y);
+      g.lineTo(29, y);
+      g.stroke();
+    }
+  }, { ramp: [pal.body[0], pal.body[1], pal.body[2], pal.head[0], pal.head[1]], outline: mix(OUTLINE, pal.body[2], 0.3) });
+}
+
+const SMALL_CLAW = [
+  '.ooooo.',
+  'o22111o',
+  'o2o2o1o',
+  'otototo',
+];
+
+export function hoardDragonImage(pal, { awake = false, spread = 0, mouth = false, scars = 0 } = {}) {
+  const s = Math.round(spread * 4) / 4;
+  const key = `hdragon:${pal.body.join()}:${awake ? 1 : 0}:${s}:${mouth ? 1 : 0}:${Math.min(scars, 10)}`;
+  return cached(key, () => {
+    const c = makeCanvas(HOARD_DRAGON_W, HOARD_DRAGON_H);
+    const g = c.getContext('2d');
+    const w = cached(`swing:${pal.wing.join()}:${s}`, () => smallWing(pal, s));
+    g.drawImage(w, 0, 0);
+    g.save();
+    g.translate(HOARD_DRAGON_W, 0);
+    g.scale(-1, 1);
+    g.drawImage(w, 0, 0);
+    g.restore();
+    g.drawImage(cached(`sbody:${pal.body.join()}:${pal.head.join()}`, () => smallBody(pal)), 0, 0);
+    const colors = colorsOf(pal);
+    const claw = sprite({ rows: SMALL_CLAW, legend: {} }, { colors });
+    g.drawImage(claw, 11, 32);
+    g.save();
+    g.translate(HOARD_DRAGON_W, 0);
+    g.scale(-1, 1);
+    g.drawImage(claw, 11, 32);
+    g.restore();
+    const head = sprite({ rows: headRows({ awake, mouth, scars }), legend: {} }, { colors });
+    g.drawImage(head, HOARD_HEAD_X - head.width / 2, HOARD_HEAD_Y);
+    return c;
+  });
+}

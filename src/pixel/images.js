@@ -1,18 +1,22 @@
-// Die fertigen Pixel-Bilder für Höhle und Tafel: Schätze, Helden, Wächter, Drachen.
+// Die fertigen Pixel-Bilder für Höhle und Tafel: Schätze, Ausrüstung, Helden, Bauten, Fähigkeiten, Drachen.
 // Was noch keine Handzeichnung hat, wird aus der alten Vektorzeichnung verpixelt.
 
-import { TREASURES } from '../data.js';
+import { TREASURES, BUILDINGS } from '../data.js';
 import { drawTreasure, drawHero } from '../icons.js';
 import { sprite, pixelize, cached, tint, makeCanvas } from './sprite.js';
 import { INK, TREASURE_ART, HERO_ART, GUARDIAN_ART, CARD_ART } from './art.js';
 import { dragonImage } from './dragon.js';
+import { buildingImg, hasBuildingArt, narrengoldImg } from './buildings.js';
 
 const legendOf = (def) => ({ ...INK, ...(def.legend ?? {}) });
 
+// Schätze und Ausrüstung (16 × 16)
 export function treasureImg(id) {
   return cached(`t:${id}`, () => {
     const def = TREASURE_ART[id];
     if (def) return sprite({ rows: def.rows, legend: legendOf(def) });
+    if (id === 'narrengold') return narrengoldImg(treasureImg('katzengold'));
+    if (hasBuildingArt(id)) return buildingImg(id);
     return pixelize(16, 16, (g) => drawTreasure(g, id, 8, 8, 15, 0));
   });
 }
@@ -27,9 +31,16 @@ export function heroImg(type) {
 
 export const guardianImg = () => cached('guardian', () => sprite({ rows: GUARDIAN_ART.rows, legend: legendOf(GUARDIAN_ART) }));
 
-// Bilder der Atem-Karten: von Hand gezeichnet oder aus Formen gerastert
-const TAU = Math.PI * 2;
-const CARD_DRAW = {
+// Was auf einem Bauplan steht und in der Höhle steht: Türme, Fallen, Köder
+export function blueprintImg(id) {
+  if (id === 'katzengold' || id === 'narrengold') return treasureImg(id);
+  return buildingImg(id);
+}
+
+export { buildingImg };
+
+// Bilder der Fähigkeiten des Drachen: von Hand gezeichnet oder aus Formen gerastert
+const ABILITY_DRAW = {
   fluegel: [['#b97d4a', '#7d5230', '#c8323c', '#741c2c', '#ecebf2'], (g) => {
     g.fillStyle = '#c8323c';
     g.beginPath();
@@ -66,61 +77,13 @@ const CARD_DRAW = {
       g.stroke();
     }
   }],
-  rauch: [['#ecebf2', '#b4adc2', '#6f6882'], (g) => {
-    g.fillStyle = '#6f6882';
-    for (const [x, y, r] of [[5, 10.5, 3.6], [9, 9, 4.6], [12.2, 11, 3.2], [8, 12.4, 3.2]]) {
-      g.beginPath();
-      g.arc(x, y, r, 0, TAU);
-      g.fill();
-    }
-    g.fillStyle = '#b4adc2';
-    for (const [x, y, r] of [[5, 9.5, 2.6], [9, 8, 3.6], [12, 10, 2.2]]) {
-      g.beginPath();
-      g.arc(x, y, r, 0, TAU);
-      g.fill();
-    }
-    g.fillStyle = '#ecebf2';
-    g.beginPath();
-    g.arc(8.2, 6.6, 1.8, 0, TAU);
-    g.fill();
-  }],
-  schwanz: [['#f2c94c', '#b97d4a', '#7d5230', '#ecebf2'], (g) => {
-    g.strokeStyle = '#b97d4a';
-    g.lineWidth = 3;
-    g.lineCap = 'round';
-    g.beginPath();
-    g.moveTo(2, 14);
-    g.quadraticCurveTo(4, 5, 11, 4.5);
-    g.stroke();
-    g.fillStyle = '#7d5230';
-    g.beginPath();
-    g.moveTo(10, 1.5);
-    g.lineTo(15, 4.5);
-    g.lineTo(10, 7.5);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = '#ecebf2';
-    g.lineWidth = 1.2;
-    g.beginPath();
-    g.arc(6, 11, 6.5, -1.9, -0.6);
-    g.stroke();
-  }],
-  glutregen: [['#ffe08a', '#ff9a3c', '#e0531f', '#6f6882'], (g) => {
-    g.fillStyle = '#6f6882';
-    g.fillRect(2, 1, 12, 3);
-    g.fillRect(4, 0, 8, 1);
-    for (const [x, y, col] of [[3, 6, '#ffe08a'], [7, 7, '#ff9a3c'], [11, 6, '#e0531f'], [5, 10, '#ff9a3c'], [9, 11, '#ffe08a'], [13, 10, '#ff9a3c'], [3, 13, '#e0531f'], [7, 14, '#ffe08a'], [11, 14, '#e0531f']]) {
-      g.fillStyle = col;
-      g.fillRect(x, y, 2, 2);
-    }
-  }],
 };
 
-export function cardImg(id) {
-  return cached(`card:${id}`, () => {
+export function abilityImg(id) {
+  return cached(`ab:${id}`, () => {
     const def = CARD_ART[id];
     if (def) return sprite({ rows: def.rows, legend: legendOf(def) });
-    const [ramp, draw] = CARD_DRAW[id] ?? [['#ff9a3c'], (g) => g.fillRect(4, 4, 8, 8)];
+    const [ramp, draw] = ABILITY_DRAW[id] ?? [['#ff9a3c'], (g) => g.fillRect(4, 4, 8, 8)];
     return pixelize(16, 16, draw, { ramp });
   });
 }
@@ -130,7 +93,6 @@ export function treasureLight(id) {
   if (id === 'ei') return [120, 240, 200];
   if (id.startsWith('rubin')) return [255, 90, 110];
   if (id.startsWith('saphir')) return [110, 170, 255];
-  if (id === 'stab') return [190, 140, 255];
   return TREASURES[id]?.value > 0 ? [255, 210, 120] : [230, 220, 170];
 }
 
@@ -142,7 +104,8 @@ export function iconURL(kind, id, _px, { silhouette = false, palette = null, sca
     if (kind === 't') img = treasureImg(id);
     else if (kind === 'hero') img = heroImg(id);
     else if (kind === 'guardian') img = guardianImg();
-    else if (kind === 'card') img = cardImg(id);
+    else if (kind === 'building') img = BUILDINGS[id] ? blueprintImg(id) : buildingImg(id);
+    else if (kind === 'ability') img = abilityImg(id);
     else img = dragonImage(palette, { awake: true, spread: 0.5, scars });
     if (silhouette) img = tint(img, '#4a3f52');
     const c = makeCanvas(img.width, img.height);

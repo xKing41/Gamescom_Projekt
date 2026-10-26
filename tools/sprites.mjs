@@ -1,4 +1,4 @@
-// Zeichnet alle Pixel-Sprites als Übersicht (8-fach vergrößert) und prüft die Raster:
+// Zeichnet alle Pixel-Sprites als Übersicht (vergrößert) und prüft die Raster:
 // Jede Zeile muss gleich lang sein, jedes Zeichen braucht eine Farbe. Braucht Playwright.
 //
 //   node tools/sprites.mjs [Bilddatei]
@@ -38,15 +38,12 @@ await page.goto('http://hort.test/blank.html');
 
 const result = await page.evaluate(async () => {
   const art = await import('/src/pixel/art.js');
-  const { sprite } = await import('/src/pixel/sprite.js');
+  const images = await import('/src/pixel/images.js');
+  const { dragonImage, hoardDragonImage } = await import('/src/pixel/dragon.js');
+  const data = await import('/src/data.js');
   const problems = [];
-  const groups = [
-    ['Schätze', art.TREASURE_ART],
-    ['Helden', { ...art.HERO_ART, waechter: art.GUARDIAN_ART }],
-    ['Karten', art.CARD_ART],
-  ];
-  // Raster prüfen
-  for (const [, set] of groups) {
+  // Raster der Handzeichnungen prüfen
+  for (const set of [art.TREASURE_ART, art.HERO_ART, { waechter: art.GUARDIAN_ART }, art.CARD_ART]) {
     for (const [id, def] of Object.entries(set)) {
       const legend = { ...art.INK, ...(def.legend ?? {}) };
       const w = def.rows[0].length;
@@ -56,8 +53,6 @@ const result = await page.evaluate(async () => {
       });
     }
   }
-  const Z = 8;
-  const pad = 16;
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
   canvas.height = 1800;
@@ -65,92 +60,45 @@ const result = await page.evaluate(async () => {
   ctx.fillStyle = '#120e19';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = false;
-  ctx.font = '14px monospace';
+  ctx.font = '13px monospace';
   let y = 10;
-  for (const [title, set] of groups) {
+  const group = (title, entries, Z = 5) => {
     ctx.fillStyle = '#f3d98d';
     ctx.fillText(title, 10, y + 14);
-    y += 24;
+    y += 22;
     let x = 10;
     let rowH = 0;
-    for (const [id, def] of Object.entries(set)) {
-      const img = sprite({ rows: def.rows, legend: { ...art.INK, ...(def.legend ?? {}) } });
+    for (const [id, img] of entries) {
       const w = img.width * Z;
       const h = img.height * Z;
       if (x + w > canvas.width - 10) {
         x = 10;
-        y += rowH + pad + 18;
+        y += rowH + 30;
         rowH = 0;
       }
-      // Kachel-Hintergrund wie in der Höhle, damit man die Lesbarkeit sieht
       ctx.fillStyle = '#2a2236';
       ctx.fillRect(x, y, w, h);
       ctx.drawImage(img, x, y, w, h);
       ctx.fillStyle = '#b5a99b';
-      ctx.fillText(id, x, y + h + 14);
-      x += w + pad;
+      ctx.fillText(id, x, y + h + 13);
+      x += Math.max(w, ctx.measureText(id).width) + 14;
       rowH = Math.max(rowH, h);
     }
-    y += rowH + pad + 24;
+    y += rowH + 36;
+  };
+  group('Schätze', Object.keys(data.TREASURES).map((id) => [id, images.treasureImg(id)]));
+  group('Ausrüstung', Object.keys(data.GEAR).map((id) => [id, images.treasureImg(id)]));
+  group('Helden', [...Object.keys(data.HEROES).map((id) => [id, images.heroImg(id)]), ['waechter', images.guardianImg()]]);
+  group('Baupläne', data.BUILDING_ORDER.map((id) => [id, images.blueprintImg(id)]));
+  group('Durchbrüche', ['brunnen', 'zwerge', 'gruft'].map((id) => [id, images.buildingImg(id)]));
+  group('Fähigkeiten', data.DRAGON.abilities.map((a) => [a.id, images.abilityImg(a.id)]));
+  const dragons = [];
+  for (const [id, sp] of Object.entries(data.SPECIES)) {
+    dragons.push([`${id} schläft`, hoardDragonImage(sp.palettes[0], {})]);
+    dragons.push([`${id} wach`, hoardDragonImage(sp.palettes[0], { awake: true, spread: 1, mouth: true })]);
   }
-  // Bilder der Atem-Karten
-  const { cardImg } = await import('/src/pixel/images.js');
-  const { CARDS } = await import('/src/data.js');
-  ctx.fillStyle = '#f3d98d';
-  ctx.fillText('Atem-Karten', 10, y + 14);
-  y += 24;
-  CARDS.forEach((card, i) => {
-    ctx.fillStyle = '#3a1f16';
-    ctx.fillRect(10 + i * 96, y, 80, 80);
-    ctx.drawImage(cardImg(card.id), 10 + i * 96, y, 80, 80);
-    ctx.fillStyle = '#b5a99b';
-    ctx.fillText(card.id, 10 + i * 96, y + 94);
-  });
-  y += 110;
-  // Alle Schätze aus dem Spiel, auch die noch nicht von Hand gezeichneten (automatisch verpixelt)
-  const { treasureImg } = await import('/src/pixel/images.js');
-  const { TREASURES } = await import('/src/data.js');
-  ctx.fillStyle = '#f3d98d';
-  ctx.fillText('Alle Schätze im Spiel (ohne Handzeichnung: verpixelt)', 10, y + 14);
-  y += 24;
-  let tx = 10;
-  for (const id of Object.keys(TREASURES)) {
-    const img = treasureImg(id);
-    if (tx + 16 * 5 > canvas.width - 10) {
-      tx = 10;
-      y += 16 * 5 + 26;
-    }
-    ctx.fillStyle = art.TREASURE_ART[id] ? '#2a2236' : '#3a2230';
-    ctx.fillRect(tx, y, 80, 80);
-    ctx.drawImage(img, tx, y, 80, 80);
-    ctx.fillStyle = '#b5a99b';
-    ctx.fillText(id, tx, y + 94);
-    tx += 96;
-  }
-  y += 16 * 5 + 34;
-  // Drachen: jede Art in Ruhe, wach mit offenen Flügeln und mit offenem Maul
-  const { dragonImage } = await import('/src/pixel/dragon.js');
-  const { SPECIES } = await import('/src/data.js');
-  ctx.fillStyle = '#f3d98d';
-  ctx.fillText('Drachen', 10, y + 14);
-  y += 24;
-  const DZ = 3;
-  let dx = 10;
-  for (const [id, sp] of Object.entries(SPECIES)) {
-    for (const [label, opts] of [['schläft', {}], ['wach', { awake: true, spread: 1 }], ['Maul', { awake: true, spread: 0.5, mouth: true, scars: 10 }]]) {
-      const img = dragonImage(sp.palettes[0], opts);
-      if (dx + img.width * DZ > canvas.width - 10) {
-        dx = 10;
-        y += img.height * DZ + 30;
-      }
-      ctx.fillStyle = '#2a2236';
-      ctx.fillRect(dx, y, img.width * DZ, img.height * DZ);
-      ctx.drawImage(img, dx, y, img.width * DZ, img.height * DZ);
-      ctx.fillStyle = '#b5a99b';
-      ctx.fillText(`${id} ${label}`, dx, y + img.height * DZ + 14);
-      dx += img.width * DZ + 12;
-    }
-  }
+  group('Drache auf dem Hort', dragons, 4);
+  group('Drache in der Höhle', Object.entries(data.SPECIES).map(([id, sp]) => [id, dragonImage(sp.palettes[0], { awake: true, spread: 1 })]), 2);
   return { problems, url: canvas.toDataURL('image/png') };
 });
 

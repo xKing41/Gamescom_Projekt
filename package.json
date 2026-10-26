@@ -2,8 +2,8 @@
   "name": "hort",
   "productName": "Hort",
   "private": true,
-  "version": "0.3.0",
-  "description": "Hort – Du bist der Drache, dein Goldhaufen ist dein Inventar.",
+  "version": "0.4.0",
+  "description": "Hort – Du bist der Drache tief im Berg, deine Kobolde graben die Höhle immer weiter, und Helden wollen deinen Hort.",
   "type": "module",
   "main": "desktop/main.cjs",
   "scripts": {

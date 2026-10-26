@@ -6,7 +6,7 @@
 <!-- head:start -->
 <title>Hort</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Hort – Prototyp. Du bist der Drache, dein Goldhaufen ist dein Inventar.">
+<meta name="description" content="Hort – Prototyp. Du bist der Drache, deine Kobolde graben die Höhle immer tiefer, und Helden wollen deinen Hort.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jacquard+24&amp;family=Pixelify+Sans:wght@400;500;600;700&amp;display=swap">
@@ -20,9 +20,9 @@
     <p class="brand">Hort</p>
     <dl class="stats">
       <div><dt>Phase</dt><dd id="s-phase">Tag 1</dd></div>
+      <div id="s-gold-wrap"><dt>Gold</dt><dd id="s-gold">0</dd></div>
       <div id="s-value-wrap"><dt>Hortwert</dt><dd id="s-value">0</dd></div>
-      <div id="s-power-wrap"><dt>Drachenkraft</dt><dd id="s-power">×1,0</dd></div>
-      <div id="s-glut-wrap" hidden><dt>Glut</dt><dd id="s-glut">0/4</dd></div>
+      <div id="s-glut-wrap"><dt>Glut</dt><dd id="s-glut">0</dd></div>
     </dl>
     <div class="bar-actions">
       <button id="btn-speed" class="ghost small" type="button" title="Tempo umschalten (F)">1×</button>
@@ -33,7 +33,7 @@
   </header>
   <main class="stage">
     <div class="board-wrap" id="board-wrap">
-      <canvas id="board" aria-label="Die Drachenhöhle: oben der Drache, darunter der Hort, unten der Eingang"></canvas>
+      <canvas id="board" aria-label="Der Berg mit der Drachenhöhle: oben der Höhlenmund, die Gänge führen hinunter zur Hortkammer mit dem Drachen"></canvas>
     </div>
     <aside class="panel" id="panel"></aside>
   </main>
@@ -43,19 +43,18 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <h2 id="help-title">So spielt sich Hort</h2>
     <dl class="rules">
-      <div><dt>Ziel</dt><dd>Beschütze dein Ei sechs Nächte lang. Trägt ein Held es aus der Höhle, ist der Run vorbei.</dd></div>
-      <div><dt>Glanz</dt><dd>Helden laufen immer zum glänzendsten Schatz, den sie erreichen und tragen können. Katzengold lenkt sie ab.</dd></div>
-      <div><dt>Gewicht</dt><dd>Diebe und Bauern tragen nur Gewicht 1, Paladine und Zwerge Gewicht 2. Gewicht 3 trägt niemand.</dd></div>
-      <div><dt>Verschmelzen</dt><dd>Zwei gleiche Schätze aufeinander werden zu einem größeren: wertvoller, glänzender, schwerer.</dd></div>
-      <div><dt>Daneben</dt><dd>Viele Schätze wirken auf ihre Nachbarn: direkt links, rechts, oben oder unten.</dd></div>
-      <div><dt>Raubzug</dt><dd>Das Raubziel bestimmt deine Beute und wer nachts kommt. Die Raben verraten dir vorher, wer es ist.</dd></div>
-      <div><dt>Nacht</dt><dd>Deine Klaue trifft Helden bis 2 Felder vor dir. Atem-Karten kosten Glut, die mit der Zeit nachlädt. Solange du zielst, läuft die Zeit langsamer.</dd></div>
-      <div><dt>Drachenkraft</dt><dd>Je mehr dein Hort wert ist, desto mehr Schaden machen Klaue und Atem.</dd></div>
-      <div><dt>Höhle</dt><dd>Zwischen den Runs wählst du Drache, Legende-Stufe, deine vier Atem-Karten und den Modus.</dd></div>
-      <div><dt>Erfahrung</dt><dd>Jeder Run bringt deiner Drachenart Erfahrung, auch ein verlorener. Jede Stufe im Drachenalter schaltet etwas frei.</dd></div>
-      <div><dt>Schlüpfen</dt><dd>Die acht Felder rund ums Ei entscheiden, welcher Drache schlüpft. Eine neue Art hat eigene Regeln.</dd></div>
-      <div><dt>Erzfeinde</dt><dd>Wer mit einem wertvollen Schatz entkommt, kommt in einem späteren Run zurück – mit deinem Schatz.</dd></div>
-      <div><dt>Tasten</dt><dd>1–4 Atem-Karten · Leertaste Pause · F Tempo · M Ton · Esc abbrechen</dd></div>
+      <div><dt>Ziel</dt><dd>Beschütze dein Ei acht Nächte lang. Trägt ein Held es aus der Höhle, ist der Run vorbei. In der letzten Nacht kommt Siegfried.</dd></div>
+      <div><dt>Ein Tag</dt><dd>Graben, dann bauen, dann kommt die Nacht. Am Morgen gibt es Gold, Beute und Erfahrung.</dd></div>
+      <div><dt>Graben</dt><dd>Jeden Tag graben die Kobolde ein Stück weiter, und die Hortkammer zieht hinterher. Der Weg der Helden wird länger. Je tiefer, desto reicher die Adern – aber manche Stücke brechen in einen Brunnen, einen Zwergenstollen oder eine Gruft durch. Von dort kommen ab dann Helden.</dd></div>
+      <div><dt>Bauen</dt><dd>Jeden Tag ziehst du vier Baupläne aus deinem Deck. Türme stehen in den Nischen neben dem Gang, Fallen im Gang, Köder in einer Nische direkt am Gang. Bezahlt wird mit Gold.</dd></div>
+      <div><dt>Glanz</dt><dd>Helden holen sich das Glänzendste, was sie tragen können – einen Schatz aus dem Hort, einen Köder oder etwas, das am Boden liegt. Ist dein Ei das Glänzendste, wollen sie das Ei.</dd></div>
+      <div><dt>Hin und zurück</dt><dd>Wer etwas klaut, muss den ganzen Weg wieder hinaus. Deine Türme treffen ihn zweimal. Fällt er, lässt er fallen, was er trägt.</dd></div>
+      <div><dt>Schutz</dt><dd>Helden haben Leben (rot), Rüstung (weiß) und Segen (blau). Schaden trifft zuerst den Segen, dann die Rüstung, dann das Leben. Speere und Feuer sind stark gegen Leben, Steine gegen Rüstung, Flüche gegen Segen. Drachenfeuer wirkt gegen alles.</dd></div>
+      <div><dt>Türme</dt><dd>Jeder Turm sammelt Erfahrung. Jede Stufe bringt einen Punkt für seinen Baum. Ausrüstung besiegter Helden baust du in die Fassungen ein.</dd></div>
+      <div><dt>Drache</dt><dd>Die Klaue trifft Helden in der Hortkammer von selbst. Feueratem, Flügelschlag und Brüllen setzt du selbst ein, danach laden sie nach. Je wertvoller dein Hort, desto stärker dein Drache.</dd></div>
+      <div><dt>Siegfried</dt><dd>Er will nur dein Ei und zerschlägt im Vorbeigehen Türme. Von vorn ist er fast unverwundbar – vollen Schaden nimmt er nur von hinten, am Lindenblatt.</dd></div>
+      <div><dt>Glut</dt><dd>Gewinnst du, bringst du die Glut nach Hause und schaltest damit in der Werkstatt neue Baupläne und Schlusssteine frei. Verlierst du das Ei, trägt der Dieb deine Glut fort – besiege ihn als Erzfeind, um sie zurückzuholen.</dd></div>
+      <div><dt>Tasten</dt><dd>1–4 Baupläne · 1–3 Fähigkeiten in der Nacht · Leertaste Pause · F Tempo · M Ton · Esc abbrechen</dd></div>
       <div><dt>Controller</dt><dd>Die Belegung steht in den Einstellungen (Lautsprecher oben rechts).</dd></div>
     </dl>
     <button class="primary" type="button" id="btn-help-close">Verstanden</button>

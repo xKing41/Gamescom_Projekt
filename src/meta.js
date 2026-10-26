@@ -1,22 +1,27 @@
-// Alles, was zwischen den Runs bleibt: Drachenarten, Erfahrung, Legende, Freischaltungen,
-// Taten, Erzfeinde, Hortbuch. Reine Funktionen ohne Speicher und ohne Grafik.
+// Alles, was zwischen den Runs bleibt: Drachenarten, Glut, Werkstatt, Deck, Legende, Taten, Erzfeinde, Hortbuch.
+// Reine Funktionen ohne Speicher und ohne Grafik.
+//
+// Glut ist die Währung zwischen den Runs. Wer gewinnt, bringt sie nach Hause.
+// Wer das Ei verliert, verliert auch die Glut: Der Dieb trägt sie fort und kommt als Erzfeind zurück.
 
-import { SPECIES, SPECIES_ORDER, DEEDS, UNLOCKS, LEGEND, META, CARDS, CARD_BY_ID, BASE_CARDS, HAND_SIZE, STANDARD_RULES, TREASURES, HEROES } from './data.js';
+import { SPECIES, SPECIES_ORDER, DEEDS, UNLOCKS, LEGEND, META, BUILDINGS, BUILDING_ORDER, BASE_DECK, DECK_SIZE, STANDARD_RULES, TREASURES, FINDS, HEROES, GEAR, ENTRANCES, PIECES } from './data.js';
 import { hoardValue } from './sim.js';
 
-export const PROFILE_VERSION = 1;
+export const PROFILE_VERSION = 2;
 
-const newSpecies = () => ({ hatched: 1, xp: 0, legend: 0, variant: 0 });
+const newSpecies = () => ({ hatched: 1, legend: 0, variant: 0 });
 
 export function newProfile() {
   return {
     version: PROFILE_VERSION,
     updatedAt: 0,
     species: { gold: newSpecies() },
+    glutEarned: 0,
+    glutSpent: 0,
     unlocks: [],
     deeds: [],
-    loadout: BASE_CARDS.slice(),
-    seen: { treasures: [], heroes: [] },
+    deck: BASE_DECK.slice(),
+    seen: { treasures: [], heroes: [], gear: [], buildings: [] },
     nemeses: [],
     trophies: [],
     stats: { runs: 0, wins: 0, nights: 0, defeated: 0 },
@@ -28,11 +33,26 @@ export function newProfile() {
 
 const list = (value, ok = () => true) => (Array.isArray(value) ? [...new Set(value.filter(ok))] : []);
 const num = (value, min = 0) => (Number.isFinite(value) ? Math.max(min, value) : min);
+export const glutOf = (p) => Math.max(0, p.glutEarned - p.glutSpent);
+
+function cleanNemesis(n) {
+  if (!n || typeof n.id !== 'string' || !HEROES[n.type]) return null;
+  return {
+    id: n.id,
+    name: String(n.name),
+    type: n.type,
+    treasure: n.treasure && TREASURES[n.treasure] ? n.treasure : null,
+    glut: Math.floor(num(n.glut)),
+    rank: Math.max(1, Math.min(META.nemesisMaxRank, Math.floor(num(n.rank, 1)))),
+  };
+}
 
 // Macht aus einem gespeicherten (vielleicht alten oder kaputten) Stand ein gültiges Profil
 export function sanitizeProfile(raw) {
   const base = newProfile();
-  if (!raw || typeof raw !== 'object' || raw.version !== PROFILE_VERSION) return base;
+  if (!raw || typeof raw !== 'object') return base;
+  if (raw.version === 1) return migrateV1(raw);
+  if (raw.version !== PROFILE_VERSION) return base;
   const p = { ...base, updatedAt: num(raw.updatedAt) };
   p.species = {};
   for (const id of SPECIES_ORDER) {
@@ -40,23 +60,26 @@ export function sanitizeProfile(raw) {
     if (!s && id !== 'gold') continue;
     p.species[id] = {
       hatched: Math.max(1, Math.floor(num(s?.hatched, 1))),
-      xp: num(s?.xp),
       legend: Math.min(LEGEND.length, Math.floor(num(s?.legend))),
       variant: Math.floor(num(s?.variant)),
     };
   }
+  p.glutEarned = Math.floor(num(raw.glutEarned));
+  p.glutSpent = Math.min(p.glutEarned, Math.floor(num(raw.glutSpent)));
   p.unlocks = list(raw.unlocks, (id) => UNLOCKS[id]);
   p.deeds = list(raw.deeds, (id) => DEEDS.some((d) => d.id === id));
-  p.loadout = list(raw.loadout, (id) => CARD_BY_ID[id]);
-  if (!p.loadout.length) p.loadout = BASE_CARDS.slice();
-  p.seen = { treasures: list(raw.seen?.treasures, (id) => TREASURES[id]), heroes: list(raw.seen?.heroes, (id) => HEROES[id]) };
-  p.nemeses = (Array.isArray(raw.nemeses) ? raw.nemeses : [])
-    .filter((n) => n && typeof n.id === 'string' && HEROES[n.type] && TREASURES[n.treasure])
-    .slice(0, META.nemesisMax)
-    .map((n) => ({ id: n.id, name: String(n.name), type: n.type, treasure: n.treasure, rank: Math.max(1, Math.min(META.nemesisMaxRank, Math.floor(num(n.rank, 1)))) }));
+  p.deck = list(raw.deck, (id) => BUILDINGS[id]);
+  p.deck = validDeck(p);
+  p.seen = {
+    treasures: list(raw.seen?.treasures, (id) => TREASURES[id]),
+    heroes: list(raw.seen?.heroes, (id) => HEROES[id]),
+    gear: list(raw.seen?.gear, (id) => GEAR[id]),
+    buildings: list(raw.seen?.buildings, (id) => BUILDINGS[id]),
+  };
+  p.nemeses = (Array.isArray(raw.nemeses) ? raw.nemeses : []).map(cleanNemesis).filter(Boolean).slice(0, META.nemesisMax);
   p.trophies = (Array.isArray(raw.trophies) ? raw.trophies : [])
-    .filter((t) => t && HEROES[t.type] && TREASURES[t.treasure])
-    .map((t) => ({ id: String(t.id ?? `${t.name}-${t.at}`), name: String(t.name), type: t.type, treasure: t.treasure, rank: Math.floor(num(t.rank, 1)), at: num(t.at) }));
+    .filter((t) => t && HEROES[t.type])
+    .map((t) => ({ id: String(t.id ?? `${t.name}-${t.at}`), name: String(t.name), type: t.type, treasure: t.treasure && TREASURES[t.treasure] ? t.treasure : null, rank: Math.floor(num(t.rank, 1)), at: num(t.at) }));
   p.stats = { runs: num(raw.stats?.runs), wins: num(raw.stats?.wins), nights: num(raw.stats?.nights), defeated: num(raw.stats?.defeated) };
   p.best = {
     endless: num(raw.best?.endless),
@@ -72,24 +95,28 @@ export function sanitizeProfile(raw) {
   return p;
 }
 
+// Ein Stand aus der Zeit vor der wachsenden Höhle: Drachen, Legende, Statistik und Erzfeinde bleiben,
+// für alte Freischaltungen gibt es Glut. Die Einführung zeigt das Spiel neu.
+function migrateV1(raw) {
+  const v2 = sanitizeProfile({
+    ...raw,
+    version: PROFILE_VERSION,
+    glutEarned: Math.min(200, 15 * num(raw.stats?.runs) + 10 * (Array.isArray(raw.unlocks) ? raw.unlocks.length : 0)),
+    glutSpent: 0,
+    unlocks: list(raw.unlocks, (id) => id === 'endlos' || id === 'woche'),
+    deck: BASE_DECK,
+    seen: { treasures: raw.seen?.treasures, heroes: raw.seen?.heroes },
+    introSeen: false,
+  });
+  // Taten, die es noch gibt, bleiben – samt ihrer Belohnung
+  for (const id of v2.deeds) for (const u of DEEDS.find((d) => d.id === id)?.unlock ?? []) if (!v2.unlocks.includes(u)) v2.unlocks.push(u);
+  return v2;
+}
+
 // ── Abfragen ────────────────────────────────────────────────────
 
-export function level(xp) {
-  let l = 0;
-  while (l < META.levels.length && xp >= META.levels[l]) l += 1;
-  return l;
-}
-
-export function levelProgress(xp) {
-  const l = level(xp);
-  if (l >= META.levels.length) return { level: l, max: true, into: 1, next: null };
-  const from = l ? META.levels[l - 1] : 0;
-  const to = META.levels[l];
-  return { level: l, max: false, into: (xp - from) / (to - from), next: to, xp };
-}
-
 export const hasUnlock = (p, id) => p.unlocks.includes(id);
-export const availableCards = (p) => CARDS.filter((c) => !c.unlock || hasUnlock(p, c.unlock)).map((c) => c.id);
+export const availableBuildings = (p) => BUILDING_ORDER.filter((id) => !BUILDINGS[id].unlock || hasUnlock(p, BUILDINGS[id].unlock));
 export const variantsOf = (p, species) => Math.min(p.species[species]?.hatched ?? 0, SPECIES[species].palettes.length);
 export const maxLegend = (p, species) => p.species[species]?.legend ?? 0;
 
@@ -100,11 +127,29 @@ export function modeAvailable(p, mode) {
   return false;
 }
 
-export function validLoadout(p) {
-  const ok = availableCards(p);
-  const hand = p.loadout.filter((id) => ok.includes(id)).slice(0, HAND_SIZE);
-  for (const id of BASE_CARDS) if (hand.length < HAND_SIZE && !hand.includes(id)) hand.push(id);
-  return hand;
+// Das Deck hat immer genau acht Baupläne: gewählte zuerst, fehlende aus der Sammlung aufgefüllt
+export function validDeck(p) {
+  const ok = availableBuildings(p);
+  const deck = (p.deck ?? []).filter((id, i, all) => ok.includes(id) && all.indexOf(id) === i).slice(0, DECK_SIZE);
+  for (const id of [...BASE_DECK, ...ok]) if (deck.length < DECK_SIZE && !deck.includes(id) && ok.includes(id)) deck.push(id);
+  return deck;
+}
+
+// Was man in der Werkstatt mit Glut freischalten kann
+export function workshop(p) {
+  return Object.entries(UNLOCKS)
+    .filter(([, u]) => u.glut)
+    .map(([id, u]) => ({ id, ...u, owned: hasUnlock(p, id) }));
+}
+
+export function buyUnlock(prev, id) {
+  const u = UNLOCKS[id];
+  if (!u?.glut || hasUnlock(prev, id)) return { ok: false, reason: '' };
+  if (glutOf(prev) < u.glut) return { ok: false, reason: `Dafür brauchst du ${u.glut} Glut.` };
+  const p = structuredClone(prev);
+  p.glutSpent += u.glut;
+  p.unlocks.push(id);
+  return { ok: true, profile: p };
 }
 
 // ISO-Kalenderwoche, z. B. „2026-W43“ – daraus entsteht der Wochen-Hort
@@ -125,13 +170,13 @@ export function weekSeed(key) {
 
 // Die Optionen für den nächsten Run, so wie sie in der Höhle gewählt sind
 export function runOptions(p, mode = p.choice.mode) {
-  if (mode === 'weekly' || mode === 'code') return { ...STANDARD_RULES, cards: STANDARD_RULES.cards.slice(), mode };
+  if (mode === 'weekly' || mode === 'code') return { ...STANDARD_RULES, deck: STANDARD_RULES.deck.slice(), mode };
   const species = p.species[p.choice.species] ? p.choice.species : 'gold';
   return {
     species,
     variant: Math.min(p.species[species].variant, variantsOf(p, species) - 1),
     legend: Math.min(p.choice.legend, maxLegend(p, species)),
-    cards: validLoadout(p),
+    deck: validDeck(p),
     unlocks: p.unlocks.slice(),
     nemeses: p.nemeses.map((n) => ({ ...n })),
     mode: modeAvailable(p, mode) ? mode : 'normal',
@@ -149,14 +194,15 @@ function makeNemesisName(type, rand) {
 function checkDeeds(state, won) {
   const log = state.runLog;
   const done = [];
-  if (log.nights.some((n) => n.decoyEscapes >= 3)) done.push('koeder');
   const survived = log.nights.slice(0, state.stats.nightsSurvived);
-  if (survived.some((n) => n.cards === 0)) done.push('still');
+  if (log.nights.some((n) => n.decoyEscapes >= 3)) done.push('koeder');
+  if (survived.some((n) => n.night >= 2 && n.abilities === 0)) done.push('still');
   if (won) done.push('brut');
-  if (log.landmark) done.push('schmied');
+  if (log.keystone) done.push('schluss');
   if (survived.some((n) => n.night >= 3 && n.stolen === 0)) done.push('unberuehrt');
-  if (log.nemesisDefeated.length) done.push('rache');
-  if (log.maxHoard >= 18) done.push('hort');
+  if (log.nemesisDefeated.some((id) => state.opts.nemeses.find((n) => n.id === id)?.type !== 'siegfried')) done.push('rache');
+  if (log.maxDepth >= 4) done.push('tief');
+  if (log.siegfried?.killed && !log.siegfried.touchedEgg) done.push('lindenblatt');
   if (won && state.opts.legend >= 5) done.push('legende');
   return done;
 }
@@ -178,9 +224,9 @@ export function applyRun(prev, state, { rand = Math.random, now = Date.now() } =
     mode: o.mode,
     won,
     nights,
-    xp: 0,
-    levelBefore: 0,
-    levelAfter: 0,
+    glut: state.glut,
+    glutBanked: 0,
+    glutLostTo: null,
     unlocked: [],
     deeds: [],
     hatched: null,
@@ -194,37 +240,7 @@ export function applyRun(prev, state, { rand = Math.random, now = Date.now() } =
     weeklyBest: false,
   };
 
-  // Erfahrung für die gespielte Art; jede Stufe schaltet etwas frei
-  const sp = p.species[o.species] ?? (p.species[o.species] = newSpecies());
-  report.xp = nights * META.xpPerNight + state.stats.defeated * META.xpPerDefeat + (won ? META.xpWin : 0);
-  report.levelBefore = level(sp.xp);
-  sp.xp += report.xp;
-  report.levelAfter = level(sp.xp);
-  for (let l = report.levelBefore; l < report.levelAfter; l++) {
-    const id = SPECIES[o.species].track[l];
-    if (id) unlock(p, id, report);
-  }
-
-  // Schlüpfen: eine neue Art oder eine neue Farbe
-  if (won && state.species) {
-    report.hatched = state.species;
-    const target = p.species[state.species];
-    if (!target) {
-      p.species[state.species] = newSpecies();
-      report.newSpecies = true;
-    } else {
-      target.hatched += 1;
-      report.newVariant = target.hatched <= SPECIES[state.species].palettes.length;
-    }
-  }
-
-  // Legende: Wer auf der höchsten offenen Stufe gewinnt, öffnet die nächste
-  if (won && o.mode === 'normal' && o.legend >= sp.legend && sp.legend < LEGEND.length) {
-    sp.legend = o.legend + 1;
-    report.legendUnlocked = sp.legend;
-  }
-
-  // Erzfeinde: besiegt, wieder entkommen, neu
+  // Erzfeinde: besiegt (ihre Glut ist schon im Run), wieder entkommen, neu
   const log = state.runLog;
   for (const id of log.nemesisDefeated) {
     const n = p.nemeses.find((x) => x.id === id);
@@ -241,9 +257,46 @@ export function applyRun(prev, state, { rand = Math.random, now = Date.now() } =
   }
   for (const fresh of log.newNemeses) {
     if (p.nemeses.length >= META.nemesisMax) break;
-    const n = { id: `e${now.toString(36)}${Math.floor(rand() * 1e6).toString(36)}`, name: makeNemesisName(fresh.type, rand), type: fresh.type, treasure: fresh.treasure, rank: 1 };
+    const n = { id: `e${now.toString(36)}${Math.floor(rand() * 1e6).toString(36)}`, name: makeNemesisName(fresh.type, rand), type: fresh.type, treasure: fresh.treasure, glut: 0, rank: 1 };
     p.nemeses.push(n);
     report.nemesesNew.push(n);
+  }
+
+  // Glut: Ein Sieg bringt sie nach Hause. Wer das Ei verliert, verliert sie an den Dieb.
+  if (won || o.mode !== 'normal') {
+    p.glutEarned += state.glut;
+    report.glutBanked = state.glut;
+  } else if (state.glut > 0 && state.lostBy) {
+    let thief = state.lostNemesis ? p.nemeses.find((n) => n.id === state.lostNemesis) : null;
+    if (!thief && state.lostBy === 'siegfried') thief = p.nemeses.find((n) => n.type === 'siegfried');
+    if (!thief && p.nemeses.length < META.nemesisMax) {
+      thief = { id: `e${now.toString(36)}g${Math.floor(rand() * 1e6).toString(36)}`, name: state.lostBy === 'siegfried' ? 'Siegfried' : makeNemesisName(state.lostBy, rand), type: state.lostBy, treasure: null, glut: 0, rank: 1 };
+      p.nemeses.push(thief);
+      report.nemesesNew.push(thief);
+    }
+    thief ??= p.nemeses[0];
+    thief.glut += state.glut;
+    report.glutLostTo = { ...thief };
+  }
+
+  // Schlüpfen: eine neue Art oder eine neue Farbe
+  if (won && state.species) {
+    report.hatched = state.species;
+    const target = p.species[state.species];
+    if (!target) {
+      p.species[state.species] = newSpecies();
+      report.newSpecies = true;
+    } else {
+      target.hatched += 1;
+      report.newVariant = target.hatched <= SPECIES[state.species].palettes.length;
+    }
+  }
+
+  // Legende: Wer auf der höchsten offenen Stufe gewinnt, öffnet die nächste
+  const sp = p.species[o.species] ?? (p.species[o.species] = newSpecies());
+  if (won && o.mode === 'normal' && o.legend >= sp.legend && sp.legend < LEGEND.length) {
+    sp.legend = o.legend + 1;
+    report.legendUnlocked = sp.legend;
   }
 
   // Taten und ihre Belohnungen
@@ -255,8 +308,11 @@ export function applyRun(prev, state, { rand = Math.random, now = Date.now() } =
   }
 
   // Hortbuch, Statistik, Bestwerte
-  p.seen.treasures = [...new Set([...p.seen.treasures, ...log.treasuresSeen])];
-  p.seen.heroes = [...new Set([...p.seen.heroes, ...log.heroesSeen])];
+  const union = (a, b) => [...new Set([...a, ...b])];
+  p.seen.treasures = union(p.seen.treasures, log.treasuresSeen);
+  p.seen.heroes = union(p.seen.heroes, log.heroesSeen);
+  p.seen.gear = union(p.seen.gear, log.gearSeen);
+  p.seen.buildings = union(p.seen.buildings, log.buildingsSeen);
   p.stats.runs += 1;
   p.stats.wins += won ? 1 : 0;
   p.stats.nights += nights;
@@ -292,14 +348,20 @@ export function mergeProfiles(a, b) {
     if (!t) p.species[id] = { ...s };
     else {
       t.hatched = Math.max(t.hatched, s.hatched);
-      t.xp = Math.max(t.xp, s.xp);
       t.legend = Math.max(t.legend, s.legend);
     }
   }
+  p.glutEarned = Math.max(p.glutEarned, older.glutEarned);
+  p.glutSpent = Math.min(p.glutEarned, Math.max(p.glutSpent, older.glutSpent));
   const union = (x, y) => [...new Set([...x, ...y])];
   p.unlocks = union(p.unlocks, older.unlocks);
   p.deeds = union(p.deeds, older.deeds);
-  p.seen = { treasures: union(p.seen.treasures, older.seen.treasures), heroes: union(p.seen.heroes, older.seen.heroes) };
+  p.seen = {
+    treasures: union(p.seen.treasures, older.seen.treasures),
+    heroes: union(p.seen.heroes, older.seen.heroes),
+    gear: union(p.seen.gear, older.seen.gear),
+    buildings: union(p.seen.buildings, older.seen.buildings),
+  };
   const trophyIds = new Set(p.trophies.map((t) => t.id));
   for (const t of older.trophies) if (!trophyIds.has(t.id)) p.trophies.push(t);
   const beaten = new Set(p.trophies.map((t) => t.id.split('-')[0]));
@@ -317,29 +379,42 @@ export const sameProfile = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // ── Hortbuch ────────────────────────────────────────────────────
 
-// Woher bekommt man einen Schatz? Für die Hinweise bei unentdeckten Einträgen.
-export function treasureHint(id, raids) {
-  const deed = DEEDS.find((d) => d.unlock?.includes(id));
-  if (deed) return `Belohnung der Tat „${deed.name}“.`;
-  for (const sid of SPECIES_ORDER) {
-    const lvl = SPECIES[sid].track.indexOf(id);
-    if (lvl >= 0) return `${SPECIES[sid].name}, Stufe ${lvl + 1} im Drachenalter.`;
-  }
-  const from = Object.entries(TREASURES).find(([, d]) => d.next === id);
-  if (from) return `Entsteht aus zwei: ${from[1].name}.`;
-  const hero = Object.values(HEROES).find((h) => h.loot === id);
-  if (hero && !Object.values(raids).some((r) => r.loot.some(([t]) => t === id))) return `Ein ${hero.name} lässt es zurück.`;
-  const sources = Object.values(raids).filter((r) => r.loot.some(([t]) => t === id)).map((r) => r.name);
-  if (sources.length) return `Beute aus: ${sources.join(', ')}.`;
-  return 'Liegt schon zu Beginn im Hort.';
+// Funde je Tiefe
+const FINDS_AT = (depth) => (FINDS[depth] ?? []).map(([id]) => id);
+
+export function treasureHint(id, species = SPECIES) {
+  if (id === 'ei') return 'Liegt von Anfang an in deinem Hort.';
+  const starts = Object.values(species).filter((s) => s.start.includes(id)).map((s) => s.name);
+  const finds = [];
+  ['an der Oberfläche', 'in der zweiten Reihe', 'in der Mitte des Bergs', 'tief im Berg', 'ganz unten im Berg'].forEach((depth, i) => {
+    if (FINDS_AT(i).includes(id)) finds.push(depth);
+  });
+  if (finds.length) return `Liegt in Grabkammern ${finds[0]}${finds.length > 1 ? ' und tiefer' : ''}.`;
+  if (starts.length) return `Im Start-Hort: ${starts.join(', ')}.`;
+  if (TREASURES[id]?.family === 'tand') return 'Was Helden von einem Köder mitnehmen.';
+  return 'Noch verborgen.';
 }
 
-export function cardHint(id) {
-  const card = CARD_BY_ID[id];
-  if (!card.unlock) return 'Von Anfang an dabei.';
-  for (const sid of SPECIES_ORDER) {
-    const lvl = SPECIES[sid].track.indexOf(card.unlock);
-    if (lvl >= 0) return `${SPECIES[sid].name}, Stufe ${lvl + 1} im Drachenalter.`;
-  }
-  return 'Noch verborgen.';
+export function heroHint(type) {
+  const entrance = Object.values(ENTRANCES).find((e) => e.party.some(([t]) => t === type));
+  if (type === 'siegfried') return 'Kommt in der letzten Nacht.';
+  if (!entrance) return 'Noch verborgen.';
+  const piece = Object.values(PIECES).find((pc) => pc.entrance && ENTRANCES[pc.entrance] === entrance);
+  return piece ? `Kommt durch den ${entrance.name}, sobald die Kobolde hineingraben (${piece.name}).` : `Kommt durch den ${entrance.name}.`;
+}
+
+export function gearHint(id) {
+  const hero = HEROES[GEAR[id]?.from];
+  return hero ? `${hero.boss ? 'Siegfried' : `Ein ${hero.name}`} lässt es manchmal zurück.` : 'Noch verborgen.';
+}
+
+export function buildingHint(id) {
+  const key = BUILDINGS[id]?.unlock;
+  if (!key) return 'Von Anfang an in deiner Sammlung.';
+  const deed = DEEDS.find((d) => d.unlock?.includes(key));
+  const glut = UNLOCKS[key]?.glut;
+  const parts = [];
+  if (glut) parts.push(`in der Werkstatt für ${glut} Glut`);
+  if (deed) parts.push(`als Belohnung der Tat „${deed.name}“`);
+  return `Freischalten ${parts.join(' oder ')}.`;
 }

@@ -79,11 +79,10 @@ await win.screenshot({ path: path.join(outDir, 'desktop-app-1-hoehle.png') });
 // Einen Run spielen und auswerten → Spielstand muss als Datei landen
 await win.click('[data-action="intro-ok"]').catch(() => {});
 await win.click('[data-action="start-run"]');
-await win.click('[data-action="raid"]');
-await win.click('[data-action="toggle-loot"][data-i="0"]');
-await win.click('[data-action="toggle-loot"][data-i="1"]');
-await win.click('[data-action="take-loot"]');
-await win.screenshot({ path: path.join(outDir, 'desktop-app-2-hort.png') });
+await win.click('[data-action="dig-dir"]');
+await win.click('[data-action="dig"]');
+await win.click('[data-action="card"]');
+await win.screenshot({ path: path.join(outDir, 'desktop-app-2-bauen.png') });
 await win.evaluate(() => {
   const { app: a, finishRun } = window.__hort;
   a.state.phase = 'lost';

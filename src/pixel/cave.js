@@ -1,22 +1,27 @@
-// Die Höhle als Pixel-Bild in 3/4-Ansicht: Fels mit sichtbaren Wänden, Steinboden,
-// der Goldhaufen des Horts, zwei Säulen, Knochen früherer Helden und der Eingang.
-// Wird einmal gebaut; alles ist aus dem Seed der Felder abgeleitet und sieht jedes Mal gleich aus.
+// Die Höhle als Pixel-Bild in 3/4-Ansicht: draußen Gras und der Höhlenmund, drinnen Fels mit sichtbaren Wänden,
+// gegrabene Gänge mit Steinboden, Nischen für Türme, Felsvorsprünge, Goldadern und die Hortkammer.
+// Wird neu gebaut, sobald die Kobolde gegraben haben. Alles ist aus der Lage der Felder abgeleitet
+// und sieht bei gleicher Höhle immer gleich aus.
 
-import { COLS, ROWS, MAP, kindAt } from '../map.js';
+import { COLS, ROWS, tileAt, MOUTH } from '../map.js';
 import { makeCanvas, hexToRgb } from './sprite.js';
 
 export const TS = 16;
 
 export const CAVE = {
   void: '#0b0910',
-  r0: '#15111d',
-  r1: '#1d1827',
-  r2: '#262032',
-  r3: '#30283e',
-  f0: '#2b2338',
-  f1: '#352b44',
-  f2: '#3f3450',
-  f3: '#4c405f',
+  r0: '#1a1524',
+  r1: '#221c2e',
+  r2: '#2b2439',
+  r3: '#352c45',
+  w0: '#1c1727', // Fuge um bearbeiteten Fels
+  w1: '#302943', // bearbeiteter Fels (Nischen)
+  w2: '#3a3250',
+  w3: '#463d5e',
+  f0: '#2c2322',
+  f1: '#3a2f2c',
+  f2: '#463934',
+  f3: '#54453e',
   e1: '#5d4f75',
   e2: '#7a6b95',
   g0: '#3d230f',
@@ -25,8 +30,12 @@ export const CAVE = {
   g3: '#b9822a',
   g4: '#e2b444',
   g5: '#fbe38a',
-  bone: '#cfc6b0',
-  boneD: '#8a8170',
+  gr0: '#18261c',
+  gr1: '#22352a',
+  gr2: '#2d4434',
+  gr3: '#3c5a42',
+  dirt: '#4a3a2c',
+  dirtL: '#5e4a36',
   stair: '#1a1622',
   stairL: '#2c2638',
 };
@@ -37,9 +46,10 @@ function hash(a, b, k = 0) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-const isRock = (c, r) => kindAt(c, r) === '#';
+const FLOOR = new Set(['.', 'h', 'E']);
+const SOLID = new Set(['#', 'n', 'l', 'v', 'e']);
 
-export function buildCave() {
+export function buildCave(tiles) {
   const W = COLS * TS;
   const H = ROWS * TS;
   const canvas = makeCanvas(W, H);
@@ -56,192 +66,155 @@ export function buildCave() {
     d[i + 2] = b;
     d[i + 3] = 255;
   };
-  const get = (x, y) => {
+  const shade = (x, y, k) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
     const i = (y * W + x) * 4;
-    return [d[i], d[i + 1], d[i + 2]];
+    d[i] *= k;
+    d[i + 1] *= k;
+    d[i + 2] *= k;
   };
+  const at = (c, r) => tileAt(tiles, c, r);
+  const floorBelow = (c, r) => FLOOR.has(at(c, r + 1));
 
-  // Boden: Stein mit Sprenkeln, Kieseln und Rissen
-  for (let r = 0; r < ROWS; r++) {
+  // Erst Boden und draußen, dann der Fels darüber – so fallen Schatten und Tropfsteine auf den fertigen Boden
+  for (const pass of [0, 1]) for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (isRock(c, r)) continue;
-      for (let y = 0; y < TS; y++) {
-        for (let x = 0; x < TS; x++) {
-          const n = hash(c * TS + x, r * TS + y, 1);
-          set(c * TS + x, r * TS + y, n < 0.12 ? 'f0' : n > 0.95 ? 'f3' : n > 0.8 ? 'f2' : 'f1');
+      const t = at(c, r);
+      const x0 = c * TS;
+      const y0 = r * TS;
+      if (SOLID.has(t) !== (pass === 1)) continue;
+      if (t === '~' || t === 'E') {
+        // Draußen: Gras, zum Höhlenmund hin ein Trampelpfad
+        for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+          const n = hash(x0 + x, y0 + y, 81);
+          set(x0 + x, y0 + y, n < 0.15 ? 'gr0' : n > 0.93 ? 'gr3' : n > 0.7 ? 'gr2' : 'gr1');
         }
-      }
-      // Fugen zwischen Steinplatten
-      if (hash(c, r, 2) > 0.35) {
-        const y0 = Math.floor(hash(c, r, 3) * 12) + 2;
-        for (let x = 0; x < TS; x++) if (hash(c * TS + x, r, 4) > 0.25) set(c * TS + x, r * TS + y0, 'f0');
-      }
-      if (hash(c, r, 5) > 0.5) {
-        const x0 = Math.floor(hash(c, r, 6) * 12) + 2;
-        for (let y = 0; y < TS; y++) if (hash(c, r * TS + y, 7) > 0.3) set(c * TS + x0, r * TS + y, 'f0');
-      }
-      // Kiesel
-      for (let k = 0; k < 2; k++) {
-        if (hash(c, r, 10 + k) < 0.6) continue;
-        const x = c * TS + 2 + Math.floor(hash(c, r, 12 + k) * 11);
-        const y = r * TS + 2 + Math.floor(hash(c, r, 14 + k) * 11);
-        set(x, y, 'e1');
-        set(x + 1, y, 'f3');
-        set(x, y + 1, 'f0');
-        set(x + 1, y + 1, 'f0');
-      }
-    }
-  }
-
-  // Der Hort: Goldmünzen auf dem Boden, dicht in der Mitte, zum Rand hin verstreut
-  const hx = 6 * TS;
-  const hy = 3.9 * TS;
-  // Abstand zum Rand der Hortfelder (0 innen): dort läuft das Gold ungleichmäßig aus
-  const HX0 = 3 * TS;
-  const HX1 = 9 * TS;
-  const HY0 = 2 * TS;
-  const HY1 = 6 * TS;
-  const edgeDist = (x, y) => Math.hypot(Math.max(HX0 - x, 0, x - HX1 + 1), Math.max(HY0 - y, 0, y - HY1 + 1));
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const c = Math.floor(x / TS);
-      const r = Math.floor(y / TS);
-      if (isRock(c, r)) continue;
-      const n = hash(x, y, 21);
-      const e = edgeDist(x, y) + hash(Math.floor(x / 3), Math.floor(y / 3), 22) * 5;
-      const pile = Math.max(0, Math.min(1, 1 - e / 9));
-      if (n < pile) set(x, y, n < pile * 0.55 ? 'g0' : n < pile * 0.93 ? 'g1' : 'g2');
-      else {
-        const dx = (x - hx) / (3.6 * TS);
-        const dy = (y - hy) / (2.6 * TS);
-        const spill = Math.max(0, 1.25 - Math.sqrt(dx * dx + dy * dy)) * 0.9;
-        if (hash(x, y, 23) < spill * 0.1) set(x, y, 'g1');
-      }
-    }
-  }
-  // Einzelne Münzen: helle Oberseite, dunkle Kante
-  for (let k = 0; k < 240; k++) {
-    const x = Math.floor(hash(k, 1, 31) * W);
-    const y = Math.floor(hash(k, 2, 32) * H);
-    const c = Math.floor(x / TS);
-    const r = Math.floor(y / TS);
-    if (isRock(c, r) || isRock(Math.floor((x + 2) / TS), r)) continue;
-    const inHoard = MAP[r][c] === 'H';
-    const dx = (x - hx) / (3.6 * TS);
-    const dy = (y - hy) / (2.6 * TS);
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (!inHoard && hash(k, 3, 33) > Math.max(0, 1.1 - dist) * 0.45) continue;
-    const bright = hash(k, 4, 34);
-    set(x, y, bright > 0.8 ? 'g4' : 'g3');
-    set(x + 1, y, bright > 0.92 ? 'g5' : 'g2');
-    set(x + 2, y, 'g1');
-    set(x, y + 1, 'g0');
-    set(x + 1, y + 1, 'g1');
-    set(x + 2, y + 1, 'g0');
-  }
-
-  // Knochen früherer Helden auf dem Boden vor dem Hort
-  const bones = [[2, 8, 0], [9, 8, 1], [1, 4, 2], [10, 5, 3], [3, 9, 4], [8, 6, 5]];
-  for (const [c, r, k] of bones) {
-    if (isRock(c, r) || MAP[r][c] === 'H') continue;
-    const x = c * TS + 3 + Math.floor(hash(k, 1, 41) * 8);
-    const y = r * TS + 4 + Math.floor(hash(k, 2, 42) * 8);
-    if (k % 3 === 0) {
-      // Schädel
-      for (const [ox, oy, col] of [[1, 0, 'bone'], [2, 0, 'bone'], [3, 0, 'bone'], [0, 1, 'bone'], [1, 1, 'r0'], [2, 1, 'bone'], [3, 1, 'r0'], [4, 1, 'boneD'], [0, 2, 'bone'], [1, 2, 'bone'], [2, 2, 'bone'], [3, 2, 'bone'], [4, 2, 'boneD'], [1, 3, 'boneD'], [2, 3, 'r0'], [3, 3, 'boneD']]) set(x + ox, y + oy, col);
-    } else {
-      // Knochen
-      for (let i = 0; i < 6; i++) set(x + i, y + (k % 2 ? i >> 1 : 0), i === 0 || i === 5 ? 'bone' : 'boneD');
-      set(x - 1, y - 1, 'bone');
-      set(x + 6, y + (k % 2 ? 3 : 1), 'bone');
-    }
-  }
-
-  // Fels: Oberseite dunkel und rau, wo darunter Boden liegt, eine sichtbare Wand mit Schichten
-  const pillar = (c, r) => [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dc, dr]) => !isRock(c + dc, r + dr));
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (!isRock(c, r)) continue;
-      if (pillar(c, r)) {
-        drawPillar(c, r);
-        continue;
-      }
-      const below = r + 1 < ROWS && !isRock(c, r + 1);
-      const face = below ? 9 : 0; // Höhe der Wand in Pixeln
-      for (let y = 0; y < TS; y++) {
-        for (let x = 0; x < TS; x++) {
-          const px = c * TS + x;
-          const py = r * TS + y;
-          const n = hash(px, py, 51);
-          if (y >= TS - face) {
-            // Wand: oben heller, unten dunkler, waagerechte Schichten
-            const k = (y - (TS - face)) / face;
-            const strata = (py + Math.floor(hash(c, r, 52) * 3)) % 4 === 0;
-            const base = k < 0.15 ? 'e2' : k < 0.45 ? 'r3' : k < 0.8 ? 'r2' : 'r1';
-            set(px, py, strata && k > 0.15 ? 'r1' : n > 0.9 ? 'r3' : base);
-          } else {
-            set(px, py, n < 0.25 ? 'r0' : n > 0.92 ? 'r2' : 'r1');
+        const dist = Math.abs(c - MOUTH.c);
+        if (dist <= 1) {
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            const px = x0 + x - (MOUTH.c * TS + 8);
+            const wPath = 5 + Math.sin((y0 + y) * 0.4) * 1.5;
+            if (Math.abs(px) < wPath) set(x0 + x, y0 + y, hash(x0 + x, y0 + y, 82) > 0.8 ? 'dirtL' : 'dirt');
           }
         }
+        if (t === 'E') {
+          // Stufen hinunter in den Berg
+          for (let y = 8; y < TS; y++) for (let x = 3; x < 13; x++) set(x0 + x, y0 + y, y % 3 === 2 ? 'stairL' : y > 13 ? 'void' : 'stair');
+        }
+        continue;
       }
-      // Kante zum Boden an den Seiten
+      if (FLOOR.has(t)) {
+        // Steinboden mit Sprenkeln, Fugen und Kieseln
+        for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+          const n = hash(x0 + x, y0 + y, 1);
+          set(x0 + x, y0 + y, n < 0.12 ? 'f0' : n > 0.95 ? 'f3' : n > 0.8 ? 'f2' : 'f1');
+        }
+        if (hash(c, r, 2) > 0.35) {
+          const yy = Math.floor(hash(c, r, 3) * 12) + 2;
+          for (let x = 0; x < TS; x++) if (hash(x0 + x, r, 4) > 0.25) set(x0 + x, y0 + yy, 'f0');
+        }
+        for (let k = 0; k < 2; k++) {
+          if (hash(c, r, 10 + k) < 0.6) continue;
+          const x = x0 + 2 + Math.floor(hash(c, r, 12 + k) * 11);
+          const y = y0 + 2 + Math.floor(hash(c, r, 14 + k) * 11);
+          set(x, y, 'e1');
+          set(x + 1, y, 'f3');
+          set(x, y + 1, 'f0');
+          set(x + 1, y + 1, 'f0');
+        }
+        if (t === 'h') {
+          // Hortkammer: verstreute Münzen, zur Mitte hin dichter
+          for (let k = 0; k < 7; k++) {
+            if (hash(c, r, 60 + k) < 0.35) continue;
+            const x = x0 + 1 + Math.floor(hash(c, r, 70 + k) * 13);
+            const y = y0 + 2 + Math.floor(hash(c, r, 80 + k) * 12);
+            const bright = hash(c, r, 90 + k);
+            set(x, y, bright > 0.7 ? 'g4' : 'g3');
+            set(x + 1, y, bright > 0.9 ? 'g5' : 'g2');
+            set(x, y + 1, 'g1');
+            set(x + 1, y + 1, 'g0');
+          }
+        }
+        continue;
+      }
+      // Fels: oben die raue Oberseite, wo darunter Boden liegt, eine Wand mit Schichten
+      const worked = t === 'n' || t === 'l' || t === 'v' || t === 'e';
+      const face = floorBelow(c, r) ? (t === 'l' ? 11 : 9) : 0;
+      for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+        const px = x0 + x;
+        const py = y0 + y;
+        const n = hash(px, py, 51);
+        if (y >= TS - face) {
+          const k = (y - (TS - face)) / face;
+          const strata = (py + Math.floor(hash(c, r, 52) * 3)) % 4 === 0;
+          const base = k < 0.15 ? 'e2' : k < 0.45 ? 'r3' : k < 0.8 ? 'r2' : 'r1';
+          set(px, py, strata && k > 0.15 ? 'r1' : n > 0.9 ? 'r3' : base);
+        } else if (t === 'l') {
+          // Felsvorsprung: heller, glatter, mit Kante
+          set(px, py, y === 0 || x === 0 ? 'e1' : x === TS - 1 ? 'w1' : n < 0.2 ? 'w2' : n > 0.9 ? 'e1' : 'w3');
+        } else if (worked) {
+          // Bearbeiteter Block: Fuge rundherum, Licht oben links
+          const edge = x === 0 || y === 0 || x === TS - 1 || y === TS - face - 1;
+          set(px, py, edge ? 'w0' : x === 1 || y === 1 ? 'w3' : n < 0.25 ? 'w1' : n > 0.92 ? 'w3' : 'w2');
+        } else {
+          set(px, py, n < 0.2 ? 'r0' : n > 0.9 ? 'r2' : n > 0.97 ? 'r3' : 'r1');
+        }
+      }
+      if (!worked && !face) {
+        // Risse und Kiesel im unberührten Fels
+        if (hash(c, r, 120) > 0.55) {
+          let x = x0 + 2 + Math.floor(hash(c, r, 121) * 10);
+          let y = y0 + 2 + Math.floor(hash(c, r, 122) * 8);
+          for (let i = 0; i < 6; i++) {
+            set(x, y, 'r0');
+            x += hash(c, r, 130 + i) > 0.5 ? 1 : 0;
+            y += 1;
+            if (y >= y0 + TS) break;
+          }
+        }
+        for (let k = 0; k < 2; k++) {
+          if (hash(c, r, 140 + k) < 0.55) continue;
+          const x = x0 + 2 + Math.floor(hash(c, r, 142 + k) * 11);
+          const y = y0 + 2 + Math.floor(hash(c, r, 144 + k) * 11);
+          set(x, y, 'r3');
+          set(x + 1, y, 'r2');
+          set(x, y + 1, 'r0');
+        }
+      }
+      // Kanten zum Boden an den Seiten
       for (const [dc, xEdge] of [[-1, 0], [1, TS - 1]]) {
-        if (c + dc < 0 || c + dc >= COLS || isRock(c + dc, r)) continue;
-        for (let y = 0; y < TS - face; y++) set(c * TS + xEdge, r * TS + y, 'r3');
+        if (!FLOOR.has(at(c + dc, r))) continue;
+        for (let y = 0; y < TS - face; y++) set(x0 + xEdge, y0 + y, worked ? 'e1' : 'r3');
       }
-      // Tropfsteine hängen von der oberen Wand
-      if (below && r === 0 && hash(c, r, 53) > 0.35) {
-        const x = c * TS + 3 + Math.floor(hash(c, r, 54) * 9);
-        const len = 2 + Math.floor(hash(c, r, 55) * 4);
-        for (let i = 0; i < len; i++) set(x, (r + 1) * TS + i, i === len - 1 ? 'r3' : 'r2');
-        set(x + 1, (r + 1) * TS, 'r1');
+      if (t === 'v') {
+        // Goldader: schräge Bänder aus Gold im Fels
+        for (let k = 0; k < 3; k++) {
+          const sx = Math.floor(hash(c, r, 100 + k) * 10) + 2;
+          const sy = Math.floor(hash(c, r, 110 + k) * 4) + 1 + k * 3;
+          for (let i = 0; i < 6; i++) {
+            const x = x0 + sx + i - 2;
+            const y = y0 + sy + Math.floor(i / 2);
+            if (y >= y0 + TS - face) break;
+            set(x, y, i % 3 === 0 ? 'g4' : 'g3');
+            set(x, y + 1, 'g1');
+          }
+        }
+        set(x0 + 5, y0 + 3, 'g5');
+        set(x0 + 11, y0 + 8, 'g5');
+      }
+      // Tropfsteine hängen von Wänden über Gängen
+      if (face && !worked && hash(c, r, 53) > 0.55) {
+        const x = x0 + 3 + Math.floor(hash(c, r, 54) * 9);
+        const len = 2 + Math.floor(hash(c, r, 55) * 3);
+        for (let i = 0; i < len; i++) set(x, y0 + TS + i, i === len - 1 ? 'r3' : 'r2');
       }
       // Schatten der Wand auf dem Boden darunter
-      if (below) for (let x = 0; x < TS; x++) {
-        const px = c * TS + x;
-        const py = (r + 1) * TS;
-        const [rr, gg, bb] = get(px, py);
-        const i = (py * W + px) * 4;
-        d[i] = rr * 0.55;
-        d[i + 1] = gg * 0.55;
-        d[i + 2] = bb * 0.55;
+      if (face) for (let x = 0; x < TS; x++) {
+        shade(x0 + x, y0 + TS, 0.55);
+        shade(x0 + x, y0 + TS + 1, 0.8);
       }
     }
   }
-
-  // Ein Tropfstein: runder Fuß, schmaler werdend, Licht von links
-  function drawPillar(c, r) {
-    for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
-      const n = hash(c * TS + x, r * TS + y, 1);
-      set(c * TS + x, r * TS + y, n < 0.12 ? 'f0' : n > 0.95 ? 'f3' : 'f1');
-    }
-    const cx = c * TS + 7.5;
-    const top = r * TS - 6;
-    const bottom = r * TS + 14;
-    for (let y = top; y <= bottom; y++) {
-      const k = (y - top) / (bottom - top);
-      const half = 1.5 + k * 5.5 + (k > 0.85 ? (k - 0.85) * 12 : 0);
-      for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) {
-        const side = (x - cx) / half;
-        const col = Math.abs(side) > 0.92 || y === top ? 'r0' : side < -0.35 ? 'e1' : side < 0.2 ? 'r3' : side < 0.65 ? 'r2' : 'r1';
-        set(x, y, (y + Math.floor(hash(c, x, 56) * 3)) % 5 === 0 && Math.abs(side) < 0.9 ? 'r1' : col);
-      }
-    }
-    // Schatten nach rechts unten
-    for (let x = 0; x < 9; x++) set(Math.round(cx) + 3 + x, bottom + 1, 'f0');
-  }
-
-  // Eingang: eine Treppe nach draußen
-  for (let c = 0; c < COLS; c++) {
-    if (kindAt(c, ROWS - 1) !== 'E') continue;
-    for (let y = 0; y < TS; y++) {
-      for (let x = 0; x < TS; x++) {
-        const step = Math.floor(y / 4);
-        set(c * TS + x, (ROWS - 1) * TS + y, y % 4 === 0 ? 'stairL' : step > 2 ? 'void' : 'stair');
-      }
-    }
-  }
-
   g.putImageData(img, 0, 0);
   return canvas;
 }

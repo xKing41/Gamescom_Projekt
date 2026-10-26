@@ -1,5 +1,5 @@
-// Browser-Test: spielt in Chromium über die echte Oberfläche – Höhle, Tag, Nacht, Run-Ende,
-// Hortbuch, Neuladen mit Spielstand, voll freigeschalteter Stand, Einstellungen und ein Hort-Code-Link.
+// Browser-Test: spielt in Chromium über die echte Oberfläche – Höhle, Graben, Bauen, Turm-Baum, Nacht, Morgen,
+// Run-Ende, Hortbuch, Neuladen mit Spielstand, voller Stand mit Werkstatt und Deck, Einstellungen und ein Hort-Code-Link.
 // Danach einen ganzen Tag und eine Nacht nur mit einem simulierten Controller.
 // Speichert Bildschirmfotos. Braucht Playwright (lokal oder global installiert).
 //
@@ -37,6 +37,20 @@ const viewports = [
 const browser = await playwright.chromium.launch();
 let failed = false;
 
+// Ein gültiger Platz für einen Bauplan, am liebsten nah an der Hortkammer
+const spotFor = (page, id) => page.evaluate((bid) => {
+  const { app, Sim } = window.__hort;
+  const s = app.state;
+  const c0 = Sim.chamberCenter(s);
+  let best = null;
+  for (let r = 1; r < 16; r++) for (let c = 0; c < 15; c++) {
+    if (!Sim.canPlace(s, bid, c, r).ok) continue;
+    const d = Math.abs(c - c0.c) + Math.abs(r - c0.r);
+    if (!best || d < best.d) best = { c, r, d };
+  }
+  return best;
+}, id);
+
 for (const vp of viewports) {
   const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height }, isMobile: !!vp.isMobile, hasTouch: !!vp.hasTouch });
   // Am Handy wie in Firefox im Artifact-Rahmen: Controller-Zugriff verboten, das Spiel muss trotzdem laufen
@@ -72,81 +86,110 @@ for (const vp of viewports) {
 
   if (await page.locator('[data-action="intro-ok"]').count()) await page.click('[data-action="intro-ok"]');
   await page.click('[data-action="start-run"]');
-  check((await phase()) === 'raid', 'Run startet nicht');
+  check((await phase()) === 'dig', 'Run startet nicht mit dem Graben');
 
-  await page.click('[data-action="raid"][data-id="dorf"]');
-  await page.click('[data-action="toggle-loot"][data-i="0"]');
-  await page.click('[data-action="toggle-loot"][data-i="1"]');
-  await page.click('[data-action="take-loot"]');
-
-  // Beute aus dem Tablett auf freie Felder legen
-  for (let k = 0; k < 2; k++) {
-    if (!(await page.locator('[data-action="pick-tray"]').count())) break;
-    await page.click('[data-action="pick-tray"][data-i="0"]');
-    const free = await page.evaluate(() => {
-      const { app, Sim } = window.__hort;
-      for (let r = 5; r >= 2; r--) for (let c = 3; c <= 8; c++) if (!Sim.itemAt(app.state, c, r)) return { c, r };
-      return null;
-    });
-    await tapCell(free.c, free.r);
-  }
-  // Ziehen per Maus: Münzen von (4,2) auf die Münzen bei (5,3) → Verschmelzen
-  if (!vp.hasTouch) {
-    const a = await page.evaluate(() => window.__hort.renderer.cellCenter(4, 2));
-    const b = await page.evaluate(() => window.__hort.renderer.cellCenter(5, 3));
-    await page.mouse.move(a.x, a.y);
-    await page.mouse.down();
-    await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2, { steps: 4 });
-    await page.mouse.move(b.x, b.y, { steps: 4 });
-    await page.mouse.up();
-    const merged = await page.evaluate(() => window.__hort.Sim.itemAt(window.__hort.app.state, 5, 3)?.id);
-    check(merged === 'barren', `Verschmelzen per Ziehen hat nicht geklappt (Feld 5,3: ${merged})`);
-  }
-  await page.waitForTimeout(200);
-  await shot('2-hort');
-
-  await page.click('[data-action="start-night"]');
-  await page.evaluate(() => { window.__hort.app.view.speed = 2; });
-  await page.waitForTimeout(2500);
-  const hero = await page.evaluate(() => {
-    const { app, Sim, renderer } = window.__hort;
-    const h = Sim.activeHeroes(app.state).find((x) => Sim.distToDragon(x.x, x.y) <= 4);
-    if (!h) return null;
-    const rect = document.getElementById('board').getBoundingClientRect();
-    const t = renderer.tileSize();
-    return { x: rect.left + h.x * t, y: rect.top + (h.y - 0.15) * t };
+  // Graben: Richtung in der Höhle antippen, Stück in der Tafel wählen, graben
+  const target = await page.evaluate(() => {
+    const { app, Sim } = window.__hort;
+    const d = Sim.digDirections(app.state)[0];
+    return { c: d.cx * 3 + 1, r: 1 + d.cy * 3 + 1, dir: d.dir };
   });
-  if (hero) {
-    await page.keyboard.press('2');
-    await tapAt(hero.x, hero.y);
+  await tapCell(target.c, target.r);
+  check(await page.evaluate((dir) => window.__hort.app.view.dig?.dir === dir, target.dir), 'Antippen eines Abschnitts wählt keine Richtung');
+  await page.click(`[data-action="dig-dir"][data-i="1"][data-dir="${target.dir}"]`);
+  await page.waitForTimeout(200);
+  await shot('2-graben');
+  const depthBefore = await page.evaluate(() => window.__hort.app.state.pieces.length);
+  await page.click('[data-action="dig"]');
+  check((await phase()) === 'build', 'Nach dem Graben geht es nicht ans Bauen');
+  check(await page.evaluate((n) => window.__hort.app.state.pieces.length === n + 1, depthBefore), 'Es wurde kein Stück gegraben');
+
+  // Bauen: einen bezahlbaren Bauplan wählen und in der Höhle platzieren
+  await page.evaluate(() => { window.__hort.app.state.gold = 200; window.__hort.app.act('deselect'); });
+  const handIndex = await page.evaluate(() => {
+    const hand = window.__hort.app.state.deck.hand;
+    const i = hand.findIndex((id) => ['speer', 'stein', 'feuer', 'fluch'].includes(id));
+    return i >= 0 ? i : 0;
+  });
+  const cardId = await page.evaluate((i) => window.__hort.app.state.deck.hand[i], handIndex);
+  await page.click(`[data-action="card"][data-i="${handIndex}"]`);
+  check(await page.evaluate((i) => window.__hort.app.view.card === i, handIndex), 'Bauplan lässt sich nicht wählen');
+  const spot = await spotFor(page, cardId);
+  await tapCell(spot.c, spot.r);
+  const built = await page.evaluate(([c, r]) => window.__hort.Sim.buildingAt(window.__hort.app.state, c, r), [spot.c, spot.r]);
+  check(built?.id === cardId, `${cardId} wurde nicht gebaut`);
+  await page.waitForTimeout(200);
+  await shot('3-bauen');
+
+  // Turm antippen, eine Stufe schenken, einen Knoten lernen
+  if (built?.kind === 'tower') {
+    await tapCell(spot.c, spot.r);
+    check(await page.evaluate(() => window.__hort.app.view.selected != null), 'Antippen wählt den Turm nicht');
+    await page.evaluate(() => {
+      const { app, Sim } = window.__hort;
+      const b = Sim.buildingByUid(app.state, app.view.selected);
+      b.level = 2;
+      b.xp = 45;
+      app.act('deselect');
+      app.act('select', { uid: b.uid });
+    });
+    await page.click('[data-action="node"][data-id="A1"]');
+    await page.click('[data-action="learn"]');
+    check(await page.evaluate(() => {
+      const { app, Sim } = window.__hort;
+      return Sim.buildingByUid(app.state, app.view.selected).nodes.includes('A1');
+    }), 'Knoten wurde nicht gelernt');
+    await page.waitForTimeout(150);
+    await shot('4-turm');
+    await page.click('[data-action="deselect"]');
   }
+  check((await overflow()) <= 0, 'Bauen ist zu breit');
+
+  // Nacht: Feueratem per Taste und Antippen
+  await page.click('[data-action="start-night"]');
+  check((await phase()) === 'night', 'Nacht beginnt nicht');
+  await page.evaluate(() => { window.__hort.app.view.speed = 2; });
+  await page.waitForFunction(() => window.__hort.Sim.activeHeroes(window.__hort.app.state).length > 0, null, { timeout: 20000 });
+  const hero = await page.evaluate(() => {
+    const h = window.__hort.Sim.activeHeroes(window.__hort.app.state)[0];
+    return { c: Math.floor(h.x), r: Math.floor(h.y) };
+  });
+  if (vp.hasTouch) await page.click('[data-action="ability"][data-id="feuer"]');
+  else await page.keyboard.press('1');
+  check(await page.evaluate(() => window.__hort.app.view.ability === 'feuer'), 'Feueratem lässt sich nicht wählen');
+  await tapCell(hero.c, hero.r);
+  check(await page.evaluate(() => window.__hort.app.state.dragon.cd.feuer > 0), 'Feueratem wurde nicht eingesetzt');
   await page.waitForTimeout(300);
-  await shot('3-nacht');
-  await page.waitForFunction(() => window.__hort.app.state.phase !== 'night', null, { timeout: 90000 });
+  await shot('5-nacht');
+  await page.waitForFunction(() => window.__hort.app.state.phase !== 'night', null, { timeout: 120000 });
+  await page.waitForTimeout(300);
+  if ((await phase()) === 'morning') {
+    await shot('6-morgen');
+    await page.click('[data-action="next-day"]');
+    check((await phase()) === 'dig', 'Nach dem Morgen kommt kein neuer Tag');
+  }
 
   // Run beenden und Auswertung prüfen
   await page.evaluate(() => {
-    const { app, finishRun } = window.__hort;
-    if (app.state.phase !== 'lost') {
-      app.state.phase = 'lost';
-      app.state.lostBy = 'dieb';
-      finishRun();
-    }
+    const { app } = window.__hort;
+    app.state.phase = 'lost';
+    app.state.lostBy = 'dieb';
+    app.state.glut = 33;
   });
-  await page.waitForTimeout(300);
-  check(await page.evaluate(() => !!window.__hort.app.report), 'Kein Bericht nach dem Run');
+  await page.waitForFunction(() => !!window.__hort.app.report);
   check(await page.evaluate(() => window.__hort.store.get().stats.runs === 1), 'Run wurde nicht gezählt');
   check((await page.locator('.rewards').count()) === 1, 'Belohnungen fehlen am Run-Ende');
-  await shot('4-ende');
+  check(await page.evaluate(() => window.__hort.store.get().nemeses.some((n) => n.glut === 33)), 'Der Dieb trägt die Glut nicht fort');
+  await shot('7-ende');
 
   await page.click('[data-action="to-hub"]');
   check((await phase()) === 'hub', 'Zurück zur Höhle klappt nicht');
   await page.click('[data-action="open-book"]');
   await page.waitForTimeout(200);
   check(await page.evaluate(() => !document.getElementById('book').hidden), 'Hortbuch öffnet nicht');
-  await shot('5-hortbuch');
+  await shot('8-hortbuch');
   await page.click('[data-tab="taten"]');
-  check((await page.locator('#book-body .entry').count()) >= 8, 'Taten fehlen im Hortbuch');
+  check((await page.locator('#book-body .entry').count()) >= 9, 'Taten fehlen im Hortbuch');
   await page.click('#btn-book-close');
 
   // Spielstand übersteht das Neuladen
@@ -154,26 +197,26 @@ for (const vp of viewports) {
   await page.waitForFunction(() => window.__hort?.app?.state);
   check(await page.evaluate(() => window.__hort.store.get().stats.runs === 1), 'Spielstand nach dem Neuladen verloren');
 
-  // Voll freigeschalteter Stand mit Erzfeinden
+  // Voll freigeschalteter Stand mit Glut, Erzfeinden und größerer Sammlung
   await page.evaluate(() => {
     const { Meta, store, showHub } = window.__hort;
     const p = Meta.newProfile();
     p.introSeen = true;
-    p.stats = { runs: 9, wins: 4, nights: 40, defeated: 300 };
-    p.species.gold.xp = 260;
-    p.species.gold.legend = 3;
-    p.species.gold.hatched = 3;
-    p.species.kristall = { hatched: 2, xp: 130, legend: 5, variant: 1 };
-    p.species.knochen = { hatched: 1, xp: 20, legend: 1, variant: 0 };
-    p.unlocks = ['krone', 'saphir', 'baerenfalle', 'glocke', 'narrenkrone', 'steinwaechter', 'karawane', 'turm', 'rauch', 'schwanz', 'glutregen', 'endlos', 'woche'];
-    p.deeds = ['brut', 'still', 'schmied'];
-    p.loadout = ['feuer', 'schnapp', 'rauch', 'glutregen'];
+    p.stats = { runs: 9, wins: 4, nights: 50, defeated: 300 };
+    p.glutEarned = 260;
+    p.glutSpent = 40;
+    p.species.gold = { hatched: 3, legend: 3, variant: 1 };
+    p.species.kristall = { hatched: 2, legend: 5, variant: 1 };
+    p.species.knochen = { hatched: 1, legend: 1, variant: 0 };
+    p.unlocks = ['mimik', 'endlos', 'woche', 'speer.B4'];
+    p.deeds = ['brut', 'still'];
+    p.deck = ['speer', 'stein', 'feuer', 'fluch', 'baerenfalle', 'stacheln', 'mimik', 'katzengold'];
     p.nemeses = [
-      { id: 'n1', name: 'Kunibert Langfinger', type: 'dieb', treasure: 'krone', rank: 2 },
-      { id: 'n2', name: 'Gernot Funkenhand', type: 'magier', treasure: 'saphir', rank: 1 },
+      { id: 'n1', name: 'Kunibert Langfinger', type: 'dieb', treasure: 'krone', glut: 0, rank: 2 },
+      { id: 'n2', name: 'Gernot Funkenhand', type: 'magier', treasure: null, glut: 48, rank: 1 },
     ];
-    p.trophies = [{ id: 'n0-1', name: 'Hedwig Steinbart', type: 'zwerg', treasure: 'barren', rank: 1, at: 1 }];
-    p.seen = { treasures: ['ei', 'muenzen', 'kelch', 'katzengold', 'rubin', 'krone', 'saphir', 'barren'], heroes: ['dieb', 'bauer', 'zwerg', 'magier'] };
+    p.trophies = [{ id: 'n0-1', name: 'Hedwig Steinbart', type: 'zwerg', treasure: null, rank: 1, at: 1 }];
+    p.seen = { treasures: ['ei', 'muenzen', 'kelch', 'krone', 'rubin'], heroes: ['dieb', 'soeldner', 'zwerg', 'magier'], gear: ['dolch', 'stab'], buildings: ['speer', 'feuer'] };
     p.choice = { species: 'kristall', legend: 4, mode: 'normal' };
     p.updatedAt = Date.now();
     store.save(p);
@@ -181,10 +224,18 @@ for (const vp of viewports) {
   });
   await page.waitForTimeout(300);
   check((await overflow()) <= 0, 'Volle Höhle ist zu breit');
-  await shot('6-hoehle-voll');
+  await shot('9-hoehle-voll');
+  // Werkstatt: Steinschlag für 50 Glut
+  await page.click('[data-action="buy"][data-id="steinschlag"]');
+  check(await page.evaluate(() => window.__hort.Meta.glutOf(window.__hort.store.get()) === 170), 'Kauf in der Werkstatt zieht keine Glut ab');
+  // Deck: Katzengold heraus, Steinschlag hinein
+  await page.click('[data-action="toggle-deck"][data-id="katzengold"]');
+  check(await page.evaluate(() => document.querySelector('[data-action="start-run"]').disabled), 'Mit sieben Bauplänen darf kein Run starten');
+  await page.click('[data-action="toggle-deck"][data-id="steinschlag"]');
+  check(await page.evaluate(() => window.__hort.store.get().deck.includes('steinschlag') && !window.__hort.store.get().deck.includes('katzengold')), 'Deck lässt sich nicht umstellen');
   await page.evaluate(() => { document.getElementById('panel').scrollTop = 99999; });
   await page.waitForTimeout(150);
-  await shot('7-hoehle-voll-unten');
+  await shot('10-hoehle-voll-unten');
 
   // Einstellungen: Lautstärke, Stummschalten, gespeichert im Browser
   await page.click('#btn-settings');
@@ -193,21 +244,18 @@ for (const vp of viewports) {
   await page.locator('#vol-music').fill('30');
   check(await page.evaluate(() => window.__hort.audio.settings.music === 0.3), 'Musik-Lautstärke wird nicht übernommen');
   check((await overflow()) <= 0, 'Einstellungen sind zu breit');
-  await shot('10-einstellungen');
+  await shot('11-einstellungen');
   await page.click('#btn-mute');
   check(await page.evaluate(() => window.__hort.audio.settings.muted === true), 'Stummschalten klappt nicht');
-  check(await page.evaluate(() => document.querySelector('#btn-settings path:nth-child(2)')?.getAttribute('d')?.startsWith('M16 9.5')), 'Kopfzeile zeigt Stumm nicht an');
   await page.click('#btn-mute');
   await page.click('#btn-settings-close');
-  check(await page.evaluate(() => document.getElementById('settings').hidden), 'Einstellungen schließen nicht');
   check(await page.evaluate(() => JSON.parse(localStorage.getItem('hort.audio.v1')).music === 0.3), 'Lautstärke wird nicht gespeichert');
-  // Klang in Echtzeit: jedes Geräusch einmal abspielen, ohne Fehler
   const sound = await page.evaluate(async () => {
     const { audio } = window.__hort;
     audio.unlock();
     await new Promise((r) => setTimeout(r, 300));
     if (!audio.running) return 'aus';
-    for (const name of ['claw', 'fire', 'roar', 'merge', 'grab', 'nightfall', 'hatch', 'click']) audio.play(name, { pan: 0.2 });
+    for (const name of ['spear', 'stone', 'curse', 'fire', 'roar', 'levelup', 'build', 'nightfall', 'hatch', 'click']) audio.play(name, { pan: 0.2 });
     await new Promise((r) => setTimeout(r, 500));
     return 'an';
   });
@@ -216,24 +264,17 @@ for (const vp of viewports) {
   // Run mit Kristalldrache, Legende 4 und Erzfeinden bis in die zweite Nacht
   await page.click('[data-action="start-run"]');
   const opts = await page.evaluate(() => window.__hort.app.state.opts);
-  check(opts.species === 'kristall' && opts.legend === 4 && opts.cards.includes('glutregen'), 'Höhlen-Auswahl kommt nicht im Run an');
+  check(opts.species === 'kristall' && opts.legend === 4 && opts.deck.includes('steinschlag') && opts.unlocks.includes('speer.B4'), 'Höhlen-Auswahl kommt nicht im Run an');
   for (let night = 1; night <= 2; night++) {
-    const realm = await page.evaluate(() => {
-      const r = window.__hort.app.state.realms;
-      return r.includes('turm') ? 'turm' : r[0];
-    });
-    await page.click(`[data-action="raid"][data-id="${realm}"]`);
-    await page.click('[data-action="toggle-loot"][data-i="0"]');
-    await page.click('[data-action="toggle-loot"][data-i="1"]');
-    await page.click('[data-action="take-loot"]');
-    if (night === 2) await shot('8-raben');
+    await page.click('[data-action="dig-dir"]');
+    await page.click('[data-action="dig"]');
+    if (night === 2) await shot('12-raben');
     await page.click('[data-action="start-night"]');
     await page.evaluate(() => { window.__hort.app.view.speed = 2; });
-    await page.waitForTimeout(night === 2 ? 4000 : 500);
-    if (night === 2) await shot('9-nacht-kristall');
     await page.waitForFunction(() => window.__hort.app.state.phase !== 'night', null, { timeout: 120000 });
+    await page.waitForTimeout(200);
     if ((await phase()) !== 'morning') break;
-    await page.click('[data-action="take-morning"]');
+    await page.click('[data-action="next-day"]');
   }
 
   // Hort-Code im Link startet einen Run mit festen Regeln (über eine leere Seite, damit wirklich neu geladen wird)
@@ -241,7 +282,7 @@ for (const vp of viewports) {
   await page.goto(`${url}#0HORT01`);
   await page.waitForFunction(() => window.__hort?.app?.state);
   const codeRun = await page.evaluate(() => ({ phase: window.__hort.app.state.phase, opts: window.__hort.app.state.opts, seed: window.__hort.app.state.seed }));
-  check(codeRun.phase === 'raid' && codeRun.opts.mode === 'code' && codeRun.opts.species === 'gold' && codeRun.seed === 1069533073, 'Hort-Code startet keinen Standard-Run');
+  check(codeRun.phase === 'dig' && codeRun.opts.mode === 'code' && codeRun.opts.species === 'gold' && codeRun.seed === 1069533073, 'Hort-Code startet keinen Standard-Run');
 
   console.log(`${vp.name}: ${errors.length ? `${errors.length} Fehler` : 'ok'}`);
   for (const e of errors) console.log(`  · ${e}`);
@@ -278,11 +319,11 @@ for (const vp of viewports) {
   const st = () => page.evaluate(() => {
     const { app } = window.__hort;
     const v = app.view;
-    return { mode: app.mode, phase: app.state.phase, input: v.input, card: v.card, held: v.held, cursor: v.cursor, aim: v.aimUid, paused: v.paused, tray: app.state.tray.length, glut: app.state.glut, focus: document.activeElement?.dataset?.action ?? document.activeElement?.id };
+    return { mode: app.mode, phase: app.state.phase, input: v.input, card: v.card, dig: v.dig, selected: v.selected, cursor: v.cursor, ability: v.ability, paused: v.paused, buildings: app.state.buildings.length, focus: document.activeElement?.dataset?.action ?? document.activeElement?.id };
   });
   // Rahmen per Steuerkreuz auf ein Feld fahren
   const moveTo = async (c, r) => {
-    for (let k = 0; k < 12; k++) {
+    for (let k = 0; k < 30; k++) {
       const cur = await st();
       const cc = Math.floor(cur.cursor.x);
       const cr = Math.floor(cur.cursor.y);
@@ -291,11 +332,6 @@ for (const vp of viewports) {
     }
     return false;
   };
-  const freeCell = () => page.evaluate(() => {
-    const { app, Sim } = window.__hort;
-    for (let r = 5; r >= 2; r--) for (let c = 3; c <= 8; c++) if (!Sim.itemAt(app.state, c, r)) return { c, r };
-    return null;
-  });
 
   await page.goto(url);
   await page.waitForFunction(() => window.__hort?.app?.state);
@@ -303,7 +339,6 @@ for (const vp of viewports) {
   await press('a');
   let s = await st();
   check(s.input === 'pad' && s.mode === 'hub', 'Der erste Druck soll nur den Controller wecken');
-  check(s.focus === 'start-run', `Fokus liegt nicht auf dem Startknopf (${s.focus})`);
   await press('back');
   check(await page.evaluate(() => !document.getElementById('help').hidden), 'View öffnet die Regeln nicht');
   await press('b');
@@ -315,92 +350,90 @@ for (const vp of viewports) {
   check(await page.evaluate((b) => window.__hort.audio.settings.sfx < b, before), 'Steuerkreuz verstellt die Lautstärke nicht');
   await shot('1-einstellungen');
   await press('b');
-  await shot('2-hoehle');
-  // Hortbuch: links neben dem Startknopf, Reiter mit LB/RB wechseln
-  await press('left');
-  await press('a');
-  check(await page.evaluate(() => !document.getElementById('book').hidden), 'A öffnet das Hortbuch nicht');
-  await press('rb');
-  check(await page.evaluate(() => document.querySelector('#book-tabs .is-on')?.dataset.tab === 'helden'), 'RB wechselt den Reiter im Hortbuch nicht');
-  await press('b');
-  check(await page.evaluate(() => document.getElementById('book').hidden), 'B schließt das Hortbuch nicht');
-  await press('right');
   await press('y');
-  check((await st()).phase === 'raid', 'Y startet keinen Run');
-  await press('a');
-  check((await st()).phase === 'loot', 'A wählt kein Raubziel');
-  await press('a');
-  await press('down');
-  await press('a');
-  await press('y');
-  s = await st();
-  check(s.phase === 'arrange', `Beute mitnehmen per Controller klappt nicht (${s.phase})`);
+  check((await st()).phase === 'dig', 'Y startet keinen Run');
 
-  // Neue Beute mit RB holen und auf freie Felder legen
-  for (let k = 0; k < 2; k++) {
-    await press('rb');
+  // Graben: Fokus auf eine Richtung, A wählt, Y gräbt
+  for (let k = 0; k < 8; k++) {
     s = await st();
-    check(s.held?.where === 'tray', 'RB nimmt keine neue Beute');
-    const free = await freeCell();
-    check(await moveTo(free.c, free.r), 'Rahmen erreicht das Feld nicht');
-    if (k === 0) await shot('3-beute-halten');
-    await press('a');
+    if (s.focus === 'dig-dir') break;
+    await press('down');
   }
-  check((await st()).tray === 0, 'Beute liegt noch im Tablett');
-
-  // Einen Schatz im Hort umlegen
-  const coin = await page.evaluate(() => {
-    const { app, Sim } = window.__hort;
-    for (let r = 2; r <= 5; r++) for (let c = 3; c <= 8; c++) {
-      const it = Sim.itemAt(app.state, c, r);
-      if (it && it.id !== 'ei') return { c, r, uid: it.uid };
-    }
-    return null;
-  });
-  await moveTo(coin.c, coin.r);
+  check((await st()).focus === 'dig-dir', 'Steuerkreuz erreicht keine Grabrichtung');
   await press('a');
-  check((await st()).held?.where === 'hoard', 'A nimmt keinen Schatz auf');
-  const target = await freeCell();
-  await moveTo(target.c, target.r);
-  await press('a');
-  const moved = await page.evaluate(([c, r]) => window.__hort.Sim.itemAt(window.__hort.app.state, c, r)?.uid, [target.c, target.r]);
-  check(moved === coin.uid, 'Schatz wurde nicht umgelegt');
-  await shot('4-hort');
+  s = await st();
+  check(s.dig?.dir, 'A wählt keine Richtung');
+  await shot('2-graben');
+  await press('y');
+  check((await st()).phase === 'build', 'Y gräbt nicht');
 
+  // Bauen: RB wählt einen Bauplan, Rahmen auf einen Platz fahren, A baut
+  await page.evaluate(() => { window.__hort.app.state.gold = 300; });
+  await press('rb');
+  s = await st();
+  check(s.card === 0, `RB wählt keinen Bauplan (${s.card})`);
+  const id = await page.evaluate(() => window.__hort.app.state.deck.hand[0]);
+  const spot = await spotFor(page, id);
+  check(await moveTo(spot.c, spot.r), 'Rahmen erreicht den Bauplatz nicht');
+  await shot('3-bauen');
+  await press('a');
+  check((await st()).buildings === 1, 'A baut nicht');
+
+  // Einen Turm bauen und mit X und A auswählen
+  const towerIndex = await page.evaluate(() => window.__hort.app.state.deck.hand.findIndex((x) => ['speer', 'stein', 'feuer', 'fluch'].includes(x)));
+  if (towerIndex >= 0) {
+    for (let k = 0; k <= towerIndex; k++) await press('rb');
+    s = await st();
+    const tid = await page.evaluate((i) => window.__hort.app.state.deck.hand[i], s.card);
+    const tspot = await spotFor(page, tid);
+    await moveTo(tspot.c, tspot.r);
+    await press('a');
+    await press('x');
+    await moveTo(tspot.c, tspot.r);
+    await press('a');
+    s = await st();
+    check(s.selected != null, 'X und A wählen keinen Turm');
+    await page.evaluate(() => {
+      const { app, Sim } = window.__hort;
+      const b = Sim.buildingByUid(app.state, app.view.selected);
+      if (b?.kind === 'tower') {
+        b.level = 1;
+        app.act('deselect');
+        app.act('select', { uid: b.uid });
+      }
+    });
+    await page.waitForTimeout(150);
+    await shot('4-turm');
+    await press('b');
+    check((await st()).selected == null, 'B verlässt den Turm nicht');
+  }
   await press('y');
   check((await st()).phase === 'night', 'Y beginnt die Nacht nicht');
 
-  // Nacht: Feueratem auf den gefährlichsten Helden, dann Zuschnappen
+  // Nacht: LB wählt den Feueratem, A speit
   await page.waitForFunction(() => window.__hort.Sim.activeHeroes(window.__hort.app.state).length > 0, null, { timeout: 20000 });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
   await press('lb');
   s = await st();
-  check(s.card === 'feuer', 'LB wählt den Feueratem nicht');
-  const keyLabel = await page.evaluate(() => document.querySelector('#card-feuer kbd')?.textContent);
-  check(keyLabel === 'LB', `Karten zeigen nicht die Xbox-Tasten (${keyLabel})`);
+  check(s.ability === 'feuer', 'LB wählt den Feueratem nicht');
+  const keyLabel = await page.evaluate(() => document.querySelector('#ab-feuer kbd')?.textContent);
+  check(keyLabel === 'LB', `Fähigkeiten zeigen nicht die Xbox-Tasten (${keyLabel})`);
   await shot('5-feuer-zielen');
-  const glutBefore = s.glut;
   await press('a');
-  check((await st()).glut < glutBefore, 'A setzt den Feueratem nicht ein');
-  await page.waitForFunction(() => {
-    const { app, Sim } = window.__hort;
-    return Sim.activeHeroes(app.state).some((h) => Sim.distToDragon(h.x, h.y) <= 3.5) && app.state.glut >= 1;
-  }, null, { timeout: 40000 }).catch(() => {});
+  check(await page.evaluate(() => window.__hort.app.state.dragon.cd.feuer > 0), 'A setzt den Feueratem nicht ein');
   await press('rb');
-  s = await st();
-  if (s.card === 'schnapp' && s.aim != null) {
-    await shot('6-schnappen-zielen');
-    const g = s.glut;
-    await press('a');
-    check((await st()).glut < g, 'A schnappt nicht zu');
-  } else {
-    check(s.card === 'schnapp', 'RB wählt Zuschnappen nicht');
-    await press('b');
-  }
+  check(await page.evaluate(() => window.__hort.app.state.dragon.cd.fluegel > 0), 'RB schlägt nicht mit den Flügeln');
   await press('start');
   check((await st()).paused === true, 'Menü pausiert die Nacht nicht');
   await press('start');
   check((await st()).paused === false, 'Menü setzt die Nacht nicht fort');
+  await page.evaluate(() => { window.__hort.app.view.speed = 2; });
+  await page.waitForFunction(() => window.__hort.app.state.phase !== 'night', null, { timeout: 120000 });
+  await page.waitForTimeout(300);
+  if ((await st()).phase === 'morning') {
+    await press('y');
+    check((await st()).phase === 'dig', 'Y führt nicht zum nächsten Tag');
+  }
 
   console.log(`controller: ${errors.length ? `${errors.length} Fehler` : 'ok'}`);
   for (const e of errors) console.log(`  · ${e}`);

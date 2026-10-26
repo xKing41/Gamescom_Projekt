@@ -490,6 +490,31 @@ export const HERO_ART = {
       '..oooooooooooo..',
     ],
   },
+  // Siegfried: blondes Haar, roter Umhang, Balmung erhoben, das Lindenblatt auf der Schulter
+  siegfried: {
+    rows: [
+      '..o.............',
+      '.oWo............',
+      '.oMo..oooooo....',
+      '.oMo.oYYYyyuo...',
+      '.oMo.oYyyyuuo...',
+      '.oMo.oyySSSuo...',
+      '.oMo.oySoSoso...',
+      'oyyyo.oSSSSso...',
+      '.oyo..ozSSzo....',
+      '.oSorMMMMmmnGo..',
+      '..oorMMyymmnrRo.',
+      '...orMmmmmnnrRo.',
+      '...oryyuyyuyrqo.',
+      '...ormmmmnnnrqo.',
+      '...oqmmmnnnnrqo.',
+      '....oNNNoNNNoqo.',
+      '....onnNonnNo...',
+      '....oNNNoNNNo...',
+      '....oddooddo....',
+      '....ooo..ooo....',
+    ],
+  },
 };
 
 // Knochenwächter: ein Skelett mit glimmenden Augen

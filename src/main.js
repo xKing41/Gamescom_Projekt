@@ -2,13 +2,14 @@
 
 import * as Sim from './sim.js';
 import * as Meta from './meta.js';
-import { TREASURES, CARD_BY_ID, HAND_SIZE } from './data.js';
+import { ABILITY_BY_ID, DRAGON, BUILDINGS, DECK_SIZE } from './data.js';
 import { createRenderer } from './render.js';
 import { createUI } from './ui.js';
 import { createStore, loadLocal } from './storage.js';
 import { randomSeed, codeToSeed } from './rng.js';
 import { createAudio } from './audio.js';
 import { createPad } from './pad.js';
+import { chunkOf } from './map.js';
 
 const canvas = document.getElementById('board');
 const wrap = document.getElementById('board-wrap');
@@ -17,17 +18,18 @@ const renderer = createRenderer(canvas);
 const view = {
   hub: true, // Höhle zwischen den Runs: das Brett ist nur Vorschau
   scars: 0,
-  held: null, // ausgewählter Schatz: { where: 'hoard', c, r } | { where: 'tray', i }
-  drag: null,
+  dig: null, // gewähltes Stollenstück und Richtung: { offer, dir }
+  card: null, // gewählter Bauplan aus der Hand (Index)
+  selected: null, // gewählter Bau (uid): Werte, Baum, Ausrüstung
+  ability: null, // Fähigkeit, mit der gerade gezielt wird
   hover: null,
   pointer: null,
   pointerType: 'mouse',
-  card: null,
   paused: false,
   speed: 1,
   input: 'pointer', // 'pointer' | 'pad' – bestimmt Rahmen, Tastenhinweise und Fokus
   cursor: null, // Controller-Rahmen in Feldern: { x, y }
-  aimUid: null, // Held, auf den der Controller gerade zielt
+  aimUid: null,
 };
 
 const audio = createAudio();
@@ -62,6 +64,14 @@ function updateProfile(change) {
   store.save(next);
 }
 
+function resetView() {
+  view.dig = null;
+  view.card = null;
+  view.selected = null;
+  view.ability = null;
+  view.paused = false;
+}
+
 // ── Höhle und Runs ──
 
 function showHub() {
@@ -72,9 +82,7 @@ function showHub() {
   app.state = Sim.createRun(1, options);
   view.hub = true;
   view.scars = Meta.maxLegend(p, options.species);
-  view.held = null;
-  view.card = null;
-  view.paused = false;
+  resetView();
   ui.render();
 }
 
@@ -84,10 +92,7 @@ function startRun(seed, options) {
   app.finished = false;
   app.state = Sim.createRun(seed, options);
   view.hub = false;
-  view.held = null;
-  view.drag = null;
-  view.card = null;
-  view.paused = false;
+  resetView();
   ui.render();
 }
 
@@ -105,9 +110,13 @@ function finishRun() {
   const { profile, report } = Meta.applyRun(store.get(), app.state);
   store.save(profile);
   app.report = report;
-  view.card = null;
-  view.paused = false;
+  resetView();
   ui.render();
+}
+
+function fail(reason) {
+  ui.toast(reason);
+  audio.ui('error');
 }
 
 function act(type, p = {}) {
@@ -133,16 +142,29 @@ function act(type, p = {}) {
       });
       showHub();
       return;
-    case 'toggle-card': {
-      const hand = Meta.validLoadout(store.get());
-      if (!hand.includes(p.id) && hand.length >= HAND_SIZE) {
-        ui.toast(`Du hast schon ${HAND_SIZE} Karten. Nimm erst eine heraus.`);
+    case 'toggle-deck': {
+      const pr = store.get();
+      const inDeck = pr.deck.includes(p.id);
+      if (!inDeck && pr.deck.length >= DECK_SIZE) {
+        fail(`Dein Deck hat schon ${DECK_SIZE} Baupläne. Nimm erst einen heraus.`);
         return;
       }
-      if (hand.includes(p.id) && hand.length <= 1) return;
-      updateProfile((pr) => {
-        pr.loadout = hand.includes(p.id) ? hand.filter((id) => id !== p.id) : [...hand, p.id];
+      updateProfile((x) => {
+        x.deck = inDeck ? x.deck.filter((id) => id !== p.id) : [...x.deck, p.id];
       });
+      ui.render();
+      return;
+    }
+    case 'buy': {
+      const result = Meta.buyUnlock(store.get(), p.id);
+      if (!result.ok) {
+        fail(result.reason);
+        return;
+      }
+      result.profile.updatedAt = Date.now();
+      store.save(result.profile);
+      audio.ui('levelup');
+      ui.toast('Freigeschaltet!');
       ui.render();
       return;
     }
@@ -168,35 +190,88 @@ function act(type, p = {}) {
       startRun(s.opts.mode === 'weekly' ? s.seed : randomSeed(), s.opts.mode === 'weekly' || s.opts.mode === 'code' ? s.opts : Meta.runOptions(store.get(), s.opts.mode));
       return;
 
-    // Run
-    case 'raid':
-      Sim.chooseRaid(s, p.id);
+    // Graben
+    case 'dig-dir':
+      view.dig = { offer: p.i, dir: p.dir };
+      audio.ui('select');
       break;
-    case 'take-loot':
-      Sim.takeLoot(s, p.indices);
-      break;
-    case 'pick-tray':
-      view.held = view.held?.where === 'tray' && view.held.i === p.i ? null : { where: 'tray', i: p.i };
-      break;
-    case 'discard': {
-      if (!view.held) return;
-      const result = Sim.discardItem(s, view.held);
-      ui.toast(result.ok ? `${TREASURES[result.id].name} weggeworfen.` : result.reason);
-      audio.ui(result.ok ? 'drop' : 'error');
-      view.held = null;
-      break;
-    }
-    case 'start-night': {
-      const result = Sim.startNight(s);
-      if (result.lost?.length) ui.toast(`Kein Platz mehr im Hort: ${result.lost.length} Schatz verloren.`);
-      view.held = null;
-      break;
-    }
-    case 'card':
-      selectCard(p.id);
+    case 'dig-preview':
+      view.dig = { offer: p.i, dir: p.dir };
+      ui.showInfo();
       return;
-    case 'take-morning':
-      Sim.takeMorningLoot(s, p.indices);
+    case 'dig': {
+      if (!view.dig || view.dig.offer == null || !view.dig.dir) return;
+      const result = Sim.dig(s, view.dig.offer, view.dig.dir);
+      if (!result.ok) fail(result.reason);
+      view.dig = null;
+      break;
+    }
+    case 'skip-dig':
+      Sim.skipDig(s);
+      break;
+
+    // Bauen
+    case 'card':
+      if (s.phase !== 'build') return;
+      view.selected = null;
+      view.card = view.card === p.i ? null : p.i;
+      if (view.card != null && BUILDINGS[s.deck.hand[view.card]].cost > s.gold) {
+        fail('Dafür reicht dein Gold nicht.');
+        view.card = null;
+      } else if (view.card != null) audio.ui('select');
+      break;
+    case 'redraw': {
+      const result = Sim.redraw(s);
+      if (!result.ok) fail(result.reason);
+      view.card = null;
+      break;
+    }
+    case 'select':
+      view.card = null;
+      view.selected = p.uid;
+      break;
+    case 'deselect':
+      view.selected = null;
+      break;
+    case 'learn': {
+      const result = Sim.learnNode(s, view.selected, p.id);
+      if (!result.ok) fail(result.reason);
+      break;
+    }
+    case 'respec': {
+      const result = Sim.respec(s, view.selected);
+      if (!result.ok) fail(result.reason);
+      else ui.toast('Umgeschult: Alle Punkte sind wieder frei.');
+      break;
+    }
+    case 'sell': {
+      const result = Sim.sellBuilding(s, view.selected);
+      if (result.ok) {
+        ui.toast(`Abgerissen: +${result.refund} Gold.`);
+        view.selected = null;
+      }
+      break;
+    }
+    case 'socket': {
+      const result = Sim.socketGear(s, view.selected, p.i);
+      if (!result.ok) fail(result.reason);
+      break;
+    }
+    case 'unsocket':
+      Sim.unsocketGear(s, view.selected, p.i);
+      break;
+    case 'start-night':
+      resetView();
+      Sim.startNight(s);
+      break;
+
+    // Nacht und Morgen
+    case 'ability':
+      selectAbility(p.id);
+      return;
+    case 'next-day':
+      Sim.nextDay(s);
+      resetView();
       break;
     case 'pause':
       if (app.mode === 'run' && s.phase === 'night') view.paused = !view.paused;
@@ -212,105 +287,105 @@ function act(type, p = {}) {
   ui.render();
 }
 
-function selectCard(id) {
+// ── Fähigkeiten des Drachen ──
+
+function selectAbility(id) {
   const s = app.state;
-  if (app.mode !== 'run' || s.phase !== 'night' || !s.opts.cards.includes(id)) return;
-  const card = CARD_BY_ID[id];
-  if (s.glut < card.cost) {
-    fail('Zu wenig Glut.');
+  if (app.mode !== 'run' || s.phase !== 'night') return;
+  const ab = ABILITY_BY_ID[id];
+  if (!Sim.abilityReady(s, id)) {
+    fail(`${ab.name.replace(/­/g, '')} lädt noch.`);
     return;
   }
-  if (card.target === 'none') {
-    const result = Sim.playCard(s, id);
-    if (!result.ok) fail(result.reason);
-    view.card = null;
+  if (ab.target === 'tile') {
+    view.ability = view.ability === id ? null : id;
+    if (view.ability) audio.ui('select');
   } else {
-    view.card = view.card === id ? null : id;
-    if (view.card) audio.ui('select');
+    const result = Sim.useAbility(s, id);
+    if (!result.ok) fail(result.reason);
+    view.ability = null;
   }
   ui.tick();
 }
 
-function fail(reason) {
-  ui.toast(reason);
-  audio.ui('error');
-}
-
-// Zielt mit der gewählten Karte: auf ein Feld { c, r } oder einen Helden { uid }
+// Zielt mit dem Feueratem auf ein Feld
 function cast(target) {
-  const result = Sim.playCard(app.state, view.card, target);
-  if (result.ok) view.card = null;
+  const result = Sim.useAbility(app.state, view.ability, target);
+  if (result.ok) view.ability = null;
   else fail(result.reason);
   ui.tick();
 }
 
-function castAt(clientX, clientY) {
-  const s = app.state;
-  const card = CARD_BY_ID[view.card];
-  if (card.target === 'tile') {
-    const cell = renderer.cellAt(clientX, clientY);
-    if (cell) cast(cell);
-    return;
-  }
-  const hero = renderer.heroAt(s, clientX, clientY, 0.9);
-  if (hero) cast({ uid: hero.uid });
-  else fail('Tippe direkt auf einen Helden.');
-}
+// ── Antippen der Höhle ──
 
-function place(from, cell) {
-  const s = app.state;
-  const id = from.where === 'tray' ? s.tray[from.i]?.id : Sim.itemAt(s, from.c, from.r)?.id;
-  const result = Sim.moveItem(s, from, cell.c, cell.r);
-  if (result.kind === 'merge') ui.toast(`Verschmolzen: ${TREASURES[result.id].name}`);
-  else if (result.ok && id) audio.ui('place', { c: cell.c, weight: TREASURES[id].weight });
-  else if (!result.ok && result.reason) fail(result.reason);
-  view.held = null;
-  ui.render();
-}
+const inDay = () => app.mode === 'run' && Sim.DAY_PHASES.has(app.state.phase);
 
-// Antippen eines Hortfelds am Tag: Schatz aufnehmen oder den gehaltenen dort ablegen
 function tapCell(cell) {
-  if (!inDay()) return;
-  if (view.held) {
-    place(view.held, cell);
+  const s = app.state;
+  if (app.mode !== 'run' || !cell) return;
+  if (s.phase === 'night') {
+    if (view.ability) cast(cell);
     return;
   }
-  if (Sim.itemAt(app.state, cell.c, cell.r)) {
-    view.held = { where: 'hoard', c: cell.c, r: cell.r };
-    audio.ui('pickup', { c: cell.c });
+  if (s.phase === 'dig' && s.offers.length && cell.r >= 1) {
+    const { cx, cy } = chunkOf(cell.c, cell.r);
+    const option = Sim.digDirections(s).find((o) => o.cx === cx && o.cy === cy);
+    if (option) {
+      view.dig = { offer: view.dig?.offer ?? 0, dir: option.dir };
+      audio.ui('select');
+      ui.render();
+      return;
+    }
+  }
+  if (s.phase === 'build' && view.card != null) {
+    const result = Sim.playCard(s, view.card, cell.c, cell.r);
+    if (result.ok) view.card = null;
+    else fail(result.reason);
+    ui.render();
+    return;
+  }
+  const b = inDay() ? Sim.buildingAt(s, cell.c, cell.r) ?? towerAbove(s, cell) : null;
+  if (b) {
+    act('select', { uid: b.uid });
+    audio.ui('pickup', { c: b.c });
+    return;
+  }
+  if (view.selected != null) {
+    view.selected = null;
     ui.render();
   }
 }
 
+// Türme ragen nach oben aus ihrem Feld: Ein Tippen knapp darüber zählt auch
+function towerAbove(s, cell) {
+  const b = Sim.buildingAt(s, cell.c, cell.r + 1);
+  return b?.kind === 'tower' ? b : null;
+}
+
 function cancel() {
-  view.card = null;
-  if (view.held) {
-    view.held = null;
+  view.ability = null;
+  if (view.card != null || view.selected != null) {
+    view.card = null;
+    view.selected = null;
     ui.render();
   }
   ui.tick();
 }
 
-const inDay = () => app.mode === 'run' && Sim.DAY_PHASES.has(app.state.phase);
-
-// ── Zeigen, Ziehen, Tippen ──
+// ── Zeigen und Tippen ──
 
 canvas.addEventListener('pointerdown', (e) => {
-  const s = app.state;
   app.pad.setInput('pointer');
-  if (!s || app.mode !== 'run') return;
   view.pointerType = e.pointerType;
   view.pointer = { x: e.clientX, y: e.clientY };
   view.hover = renderer.cellAt(e.clientX, e.clientY);
-  if (s.phase === 'night') {
-    if (view.card) castAt(e.clientX, e.clientY);
-    return;
-  }
-  if (!inDay() || view.held || !view.hover) return;
-  if (Sim.itemAt(s, view.hover.c, view.hover.r)) {
-    view.drag = { from: { where: 'hoard', c: view.hover.c, r: view.hover.r }, x0: e.clientX, y0: e.clientY, moved: false };
-    canvas.setPointerCapture(e.pointerId);
-  }
+  // Nachts zählt jeder Augenblick: sofort zielen
+  if (app.mode === 'run' && app.state.phase === 'night' && view.ability) tapCell(view.hover);
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  if (app.mode !== 'run' || app.state.phase === 'night') return;
+  tapCell(renderer.cellAt(e.clientX, e.clientY));
 });
 
 canvas.addEventListener('pointermove', (e) => {
@@ -322,45 +397,26 @@ canvas.addEventListener('pointermove', (e) => {
   view.pointerType = e.pointerType;
   view.pointer = { x: e.clientX, y: e.clientY };
   view.hover = app.mode === 'run' ? renderer.cellAt(e.clientX, e.clientY) : null;
-  if (view.drag && !view.drag.moved && Math.hypot(e.clientX - view.drag.x0, e.clientY - view.drag.y0) > 8) view.drag.moved = true;
   ui.showInfo();
-});
-
-canvas.addEventListener('pointerup', (e) => {
-  if (!inDay()) {
-    view.drag = null;
-    return;
-  }
-  const cell = renderer.cellAt(e.clientX, e.clientY);
-  if (view.drag) {
-    const drag = view.drag;
-    view.drag = null;
-    if (drag.moved) {
-      if (cell) place(drag.from, cell);
-      return;
-    }
-    tapCell(drag.from);
-    return;
-  }
-  if (view.held && cell) place(view.held, cell);
-});
-
-canvas.addEventListener('pointercancel', () => {
-  view.drag = null;
 });
 
 canvas.addEventListener('pointerleave', () => {
   view.hover = null;
-  if (!view.drag) view.pointer = null;
+  view.pointer = null;
   ui.showInfo();
 });
 
 window.addEventListener('keydown', (e) => {
   const s = app.state;
   if (!s || e.target.closest?.('input, textarea')) return;
-  const night = app.mode === 'run' && s.phase === 'night';
-  if (night && e.key >= '1' && e.key <= String(s.opts.cards.length)) {
-    selectCard(s.opts.cards[Number(e.key) - 1]);
+  const run = app.mode === 'run';
+  const night = run && s.phase === 'night';
+  const n = Number(e.key);
+  if (night && n >= 1 && n <= DRAGON.abilities.length) {
+    selectAbility(DRAGON.abilities[n - 1].id);
+    e.preventDefault();
+  } else if (run && s.phase === 'build' && n >= 1 && n <= s.deck.hand.length) {
+    act('card', { i: n - 1 });
     e.preventDefault();
   } else if (e.key === 'Escape') {
     ui.closeOverlays();
@@ -380,6 +436,7 @@ window.addEventListener('keydown', (e) => {
 // ── Schleife ──
 
 let last = performance.now();
+let shownPhase = null;
 
 // Ton und Controller sind Zugaben: Geht dort etwas schief, läuft das Spiel trotzdem weiter.
 // Der Fehler landet in der Konsole, damit die Tests ihn sehen.
@@ -398,14 +455,19 @@ function frame(now) {
   const s = app.state;
   // Solange Regeln, Hortbuch oder Einstellungen offen sind, steht die Nacht still
   if (s && app.mode === 'run' && s.phase === 'night' && !view.paused && !ui.overlayOpen()) {
-    const aiming = view.card && CARD_BY_ID[view.card].target !== 'none';
+    const aiming = view.ability === 'feuer';
     Sim.update(s, dt * view.speed * (aiming ? 0.3 : 1));
-    if (s.phase !== 'night') {
-      view.card = null;
+  }
+  // Ist die Nacht vorbei (oder der Run), zeigt die Tafel den Morgen oder das Ende
+  if (s && app.mode === 'run' && s.phase !== shownPhase) {
+    const from = shownPhase;
+    shownPhase = s.phase;
+    if (from === 'night') {
+      view.ability = null;
       view.paused = false;
-      if (s.phase === 'won' || s.phase === 'lost') finishRun();
-      else ui.render();
     }
+    if ((s.phase === 'won' || s.phase === 'lost') && !app.finished) finishRun();
+    else if (from === 'night') ui.render();
   }
   safely(() => audio.update(s, app.mode, view));
   if (s?.fx.length) {
@@ -422,11 +484,10 @@ app.pad = createPad(app, {
   renderer,
   actions: {
     tapCell,
-    selectCard,
+    selectAbility,
     cast,
     cancel,
     fail,
-    pickTray: (i) => act('pick-tray', { i }),
     closeOverlays: () => ui.closeOverlays(),
     openHelp: () => ui.openHelp(),
     openSettings: () => ui.openSettings(),
@@ -438,10 +499,10 @@ app.pad = createPad(app, {
 for (const type of ['pointerdown', 'pointerup', 'keydown', 'click']) window.addEventListener(type, () => audio.unlock(), { capture: true, passive: true });
 if (window.hortDesktop) audio.unlock();
 
-// Leiser Klick für Knöpfe; Karten haben ihren eigenen Klang
+// Leiser Klick für Knöpfe; Baupläne und Fähigkeiten haben ihren eigenen Klang
 document.addEventListener('click', (e) => {
   const btn = e.target.closest?.('button');
-  if (btn && !btn.disabled && btn.dataset.action !== 'card') audio.ui('click');
+  if (btn && !btn.disabled && !['card', 'ability', 'dig-dir'].includes(btn.dataset.action)) audio.ui('click');
 }, true);
 
 new ResizeObserver(() => renderer.resize(wrap.clientWidth, wrap.clientHeight)).observe(wrap);
